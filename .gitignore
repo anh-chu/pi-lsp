@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+
+# build / test artifacts
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# env / local overrides
+.env
+.env.*
+!.env.example
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# temp files
+.tmp/
+tmp/
+*.tmp
+
+# local agent/tool artifacts
+.pi-lens/
+.codesight/
+
+# package manager cache if created locally
+.npm/
