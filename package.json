@@ -11,6 +11,10 @@
     "bench:harness:pilot": "node --experimental-strip-types benchmarks/automation/run-harness-benchmarks.mjs --ids A-01,B-01,C-01,E-01",
     "bench:live": "node benchmarks/automation/run-live-benchmarks.mjs",
     "bench:live:pilot": "node benchmarks/automation/run-live-benchmarks.mjs --ids A-01,B-01,C-01,E-01",
+    "bench:live:smoke": "node benchmarks/automation/run-live-benchmarks.mjs --ids E-01,A-01,B-01",
+    "bench:live:dev": "node benchmarks/automation/run-live-benchmarks.mjs --ids A-01,B-01,B-02,F-03,E-01",
+    "bench:live:expanded": "node benchmarks/automation/run-live-benchmarks.mjs --ids A-01,A-02,A-03,B-01,B-02,B-03,C-01,F-02,F-03,E-01",
+    "bench:live:milestone": "node benchmarks/automation/run-live-benchmarks.mjs --ids A-01,A-02,A-03,B-01,B-02,B-03,C-01,D-02,E-01,F-02,F-03",
     "bench:live:full": "node benchmarks/automation/run-live-benchmarks.mjs"
   },
   "devDependencies": {

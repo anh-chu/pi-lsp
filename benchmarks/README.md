@@ -95,3 +95,32 @@ Recommended usage:
 - review heuristic quality scores manually before making final claims
 - summary now includes a treatment usage breakdown separating: direct `pi_lsp` adoption (`get_symbol` / `find_definition` / `find_references`), treatment-context-only runs (`rank_context` without direct adoption), and treatment-loaded-but-unused / bypass runs
 - result rows may include `treatment_usage_class`, `treatment_direct_adoption_calls`, and `treatment_context_calls` for practical downstream reporting against the current schema
+
+### Suggested benchmark tiers
+
+- `npm run bench:live:smoke`
+  - rows: `E-01,A-01,B-01`
+  - use: cheapest fast model for runner/control smoke checks
+
+- `npm run bench:live:dev`
+  - rows: `A-01,B-01,B-02,F-03,E-01`
+  - use: regular iteration set on a faster code model such as `gpt-5.1-codex-mini`
+
+- `npm run bench:live:expanded`
+  - rows: `A-01,A-02,A-03,B-01,B-02,B-03,C-01,F-02,F-03,E-01`
+  - use: broader pre-milestone adoption check on mid-tier model
+
+- `npm run bench:live:milestone`
+  - rows: `A-01,A-02,A-03,B-01,B-02,B-03,C-01,D-02,E-01,F-02,F-03`
+  - use: practical milestone set when full matrix on strongest model is too slow
+
+- `npm run bench:live:full`
+  - rows: all discovered prompt ids
+  - use: strongest-model checkpoint / publishable snapshot
+
+### Recommended model mapping
+
+- smoke: cheap fast model like `gemini-2.0-flash-lite`
+- dev / expanded: `gpt-5.1-codex-mini`
+- milestone full-matrix checkpoint: `gpt-5.4-mini`
+- if milestone runtime matters more than full coverage, prefer `bench:live:milestone` on `gpt-5.1-codex-mini` before paying for `bench:live:full` on `gpt-5.4-mini`
