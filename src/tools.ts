@@ -61,11 +61,13 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_get_symbol',
     label: 'Pi LSP Get Symbol',
-    description: 'Read one symbol definition with minimal surrounding code',
-    promptSnippet: 'Read one symbol definition with minimal surrounding code',
+    description: 'Read one exact grounded symbol definition with minimal code, plus next-step hints for follow-up tracing',
+    promptSnippet: 'Read one grounded symbol definition with minimal surrounding code',
     promptGuidelines: [
-      'Use this tool when exact function/class/type is needed instead of whole-file reads.',
-      'Prefer this before reading large files.',
+      'Use this tool after the exact function/class/type name is grounded from current source or repo context.',
+      'Prefer this over plain read once you know the exact symbol name, because it returns the minimal definition slice plus location/confidence metadata.',
+      'If exact symbol name is still uncertain, do not guess variants; use codesight_* or read current source first, then retry with a precise name or file hint.',
+      'Use the returned details.suggestedNext* fields to decide whether to inspect the body, trace references, or fall back to repo discovery.',
     ],
     parameters: {
       type: 'object',
@@ -86,9 +88,14 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_find_definition',
     label: 'Pi LSP Find Definition',
-    description: 'Find where a symbol is defined',
-    promptSnippet: 'Find where a symbol is defined',
-    promptGuidelines: ['Use this tool before tracing references or reading implementation.'],
+    description: 'Find the exact definition location for a grounded symbol, with safe next-step guidance for reading the implementation',
+    promptSnippet: 'Find where a grounded symbol is defined',
+    promptGuidelines: [
+      'Use this after the exact symbol name is known.',
+      'Prefer this over plain read when you only need the owning file/line first; it returns location/confidence metadata and a suggested next tool.',
+      'Prefer codesight_* first for repo-level discovery or when you only know a feature area, route surface, schema area, or package name.',
+      'Use the returned details.suggestedNext* fields to decide whether to jump to pi_lsp_get_symbol, pi_lsp_find_references, or repo discovery.',
+    ],
     parameters: {
       type: 'object',
       properties: {
@@ -106,9 +113,14 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_find_references',
     label: 'Pi LSP Find References',
-    description: 'Find references or usages of a symbol',
-    promptSnippet: 'Find references or usages of a symbol',
-    promptGuidelines: ['Use this tool when tracing symbol impact at code level.'],
+    description: 'Find grounded symbol usages with grouped hits, confidence/fallback metadata, and safe next-step hints',
+    promptSnippet: 'Find references or usages of a grounded symbol',
+    promptGuidelines: [
+      'Use this when tracing impact for an exact grounded symbol at code level.',
+      'Prefer this over plain read once the symbol is exact, because it groups usage hits and reports backend/confidence/fallback metadata.',
+      'Do not use this as a first-pass repo exploration tool; prefer codesight_* first when callers or names are still unknown.',
+      'Use the returned details.suggestedNext* fields to decide whether to inspect one caller, ground the definition first, or fall back to repo discovery.',
+    ],
     parameters: {
       type: 'object',
       properties: {
@@ -127,27 +139,57 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_rank_context',
     label: 'Pi LSP Rank Context',
-    description: 'Rank most relevant files and symbols for current task',
-    promptSnippet: 'Rank most relevant files and symbols for current task',
+    description: 'Prioritize files and symbols already observed in this session; not a repo discovery tool',
+    promptSnippet: 'Prioritize already-seen session context for the current task',
     promptGuidelines: [
-      'Use this tool in large repos or monorepos before broad exploration.',
-      'Use when user asks what to inspect next.',
+      'Use this only after concrete session evidence exists from this run, such as read files, mentioned files, or grounded symbol lookups.',
+      'Do not use this as a first-step repo exploration tool in a fresh session. It ranks session memory only and cannot discover unseen code.',
+      'If session evidence counts are all zero, inspect source with read or codesight_* first, then rerun ranking only if you need prioritization.',
+      'Treat any fresh-session result as a warning state, not as ranked repo context.',
     ],
     parameters: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Task or question to rank context for' },
+        query: { type: 'string', description: 'Task or question to prioritize already-seen context for' },
         limit: { type: 'number', description: 'Maximum number of ranked items', minimum: 1, maximum: 20 },
       },
     },
     execute: async (_toolCallId: string, params: { query?: string; limit?: number }) => {
-      const items = rankContext(params.query ?? '', params.limit ?? 10);
+      const result = rankContext(params.query ?? '', params.limit ?? 10);
       return textResult(
         formatCompactSection(
-          'Ranked context',
-          items.map((item) => `- ${item.kind}: ${item.id} (${item.score}) — ${item.reason}`),
+          result.sessionState.hasConcreteEvidence ? 'Session context ranking' : 'Fresh-session warning',
+          [
+            `- query: ${result.query || '(empty)'}`,
+            `- session files mentioned: ${result.sessionState.mentionedFiles}`,
+            `- session files read: ${result.sessionState.readFiles}`,
+            `- session symbols queried: ${result.sessionState.queriedSymbols}`,
+            `- concrete session evidence: ${result.sessionState.hasConcreteEvidence ? 'yes' : 'no'}`,
+            `- status: ${result.status}`,
+            `- confidence: ${result.confidence}`,
+            `- rerun after evidence: ${result.shouldRerunAfterEvidence ? 'recommended' : 'not needed'}`,
+            `- note: ${result.note}`,
+            ...result.guidance.map((line) => `- guidance: ${line}`),
+            ...(result.items.length > 0
+              ? result.items.map((item) => `- ${item.kind}: ${item.id} (${item.score}) — ${item.reason}`)
+              : [
+                  result.sessionState.hasConcreteEvidence
+                    ? '- ranked items: none yet'
+                    : '- ranked items: withheld until some session evidence exists',
+                ]),
+          ],
         ),
-        { query: params.query ?? '', items },
+        {
+          query: result.query,
+          items: result.items,
+          sessionState: result.sessionState,
+          note: result.note,
+          guidance: result.guidance,
+          status: result.status,
+          confidence: result.confidence,
+          shouldRerunAfterEvidence: result.shouldRerunAfterEvidence,
+          freshSession: !result.sessionState.hasConcreteEvidence,
+        }
       );
     },
   });

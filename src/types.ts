@@ -58,6 +58,15 @@ export interface DefinitionResult {
     ambiguous?: boolean;
     candidates?: unknown;
     confidence?: 'high' | 'medium' | 'low';
+    owningFile?: string;
+    nextBestTool?: 'pi_lsp_get_symbol' | 'pi_lsp_find_references' | 'codesight_*' | 'read';
+    nextBestReason?: string;
+    nextBestArgs?: Record<string, unknown>;
+    suggestedNextTool?: 'pi_lsp_get_symbol' | 'pi_lsp_find_references' | 'codesight_*' | 'read';
+    suggestedNextReason?: string;
+    suggestedNextArgs?: Record<string, unknown>;
+    suggestedNextSteps?: string[];
+    status?: 'resolved' | 'ambiguous' | 'not-found';
   };
 }
 
@@ -69,6 +78,8 @@ export interface ReferenceHit {
   confidence?: 'high' | 'medium' | 'low';
   backend?: 'lsp' | 'ast' | 'fallback';
   fallback?: boolean;
+  previewPriority?: number;
+  previewPriorityReason?: string;
 }
 
 export interface ReferenceFileGroup {
@@ -84,7 +95,18 @@ export interface ReferenceFileGroup {
     confidence?: 'high' | 'medium' | 'low';
     backend?: 'lsp' | 'ast' | 'fallback';
     fallback?: boolean;
+    previewPriority?: number;
+    previewPriorityReason?: string;
   }>;
+  topPreview?: {
+    line: number;
+    character?: number;
+    preview?: string;
+    previewPriority?: number;
+    previewPriorityReason?: string;
+  };
+  impactScore?: number;
+  impactReason?: string;
 }
 
 export interface ReferenceResult {
@@ -105,6 +127,26 @@ export interface ReferenceResult {
     definitionConfidence?: 'high' | 'medium' | 'low';
     definitionFallback?: boolean;
     ok?: boolean;
+    owningFile?: string;
+    nextBestTool?: 'pi_lsp_get_symbol' | 'pi_lsp_find_definition' | 'codesight_*' | 'read';
+    nextBestReason?: string;
+    nextBestArgs?: Record<string, unknown>;
+    suggestedNextTool?: 'pi_lsp_get_symbol' | 'pi_lsp_find_definition' | 'codesight_*' | 'read';
+    suggestedNextReason?: string;
+    suggestedNextArgs?: Record<string, unknown>;
+    suggestedNextSteps?: string[];
+    bestNextCallerFile?: string;
+    bestNextCallerReason?: string;
+    bestNextReadArgs?: Record<string, unknown>;
+    topImpactFiles?: Array<{
+      file: string;
+      impactScore: number;
+      reason: string;
+      count: number;
+      topLine?: number;
+      topPreview?: string;
+    }>;
+    status?: 'resolved' | 'not-found';
   };
 }
 

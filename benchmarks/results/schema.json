@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pi-lsp benchmark result row",
+  "type": "object",
+  "required": [
+    "run_id",
+    "condition",
+    "suite",
+    "prompt_id",
+    "cwd",
+    "model",
+    "thinking_level",
+    "duration_ms",
+    "turns",
+    "tool_calls",
+    "files_read",
+    "quality_score"
+  ],
+  "properties": {
+    "run_id": { "type": "string" },
+    "condition": { "type": "string", "enum": ["baseline", "treatment"] },
+    "suite": { "type": "string", "enum": ["symbol", "refs", "ranking", "debug", "control"] },
+    "prompt_id": { "type": "string" },
+    "cwd": { "type": "string" },
+    "timestamp": { "type": "string" },
+    "model": { "type": "string" },
+    "thinking_level": { "type": "string" },
+    "input_tokens": { "type": ["number", "null"] },
+    "output_tokens": { "type": ["number", "null"] },
+    "cost": { "type": ["number", "null"] },
+    "duration_ms": {
+      "type": ["number", "null"],
+      "description": "Elapsed time in milliseconds. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
+    },
+    "turns": {
+      "type": ["number", "null"],
+      "description": "Conversation turn count. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
+    },
+    "tool_calls": {
+      "type": ["number", "null"],
+      "description": "Total tool calls observed for the run. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
+    },
+    "tool_call_breakdown": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "files_read": {
+      "type": ["number", "null"],
+      "description": "Total files read during the run. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
+    },
+    "bytes_read": { "type": ["number", "null"] },
+    "quality_score": { "type": "number", "minimum": 0, "maximum": 2 },
+    "precision_score": { "type": ["number", "null"], "minimum": 0, "maximum": 2 },
+    "answer_text": { "type": ["string", "null"] },
+    "session_path": { "type": ["string", "null"] },
+    "treatment_usage_class": {
+      "type": ["string", "null"],
+      "enum": ["direct_adoption", "treatment_context_only", "treatment_loaded_but_unused", null],
+      "description": "Treatment-only classification for pi-lsp usage in the run: direct symbol/definition/reference adoption, rank-context-only usage, or treatment loaded but bypassed."
+    },
+    "treatment_direct_adoption_calls": {
+      "type": ["number", "null"],
+      "description": "Count of direct pi-lsp adoption calls (`pi_lsp_get_symbol`, `pi_lsp_find_definition`, `pi_lsp_find_references`) in treatment runs."
+    },
+    "treatment_context_calls": {
+      "type": ["number", "null"],
+      "description": "Count of treatment-context-only calls (`pi_lsp_rank_context`) in treatment runs."
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "Freeform benchmark notes. Pi runtime artifacts may expose machine-readable usage in extension-owned files such as .pi/suggester/sessions/*/usage.json (session aggregates like inputTokens/outputTokens/costTotal) and .pi/suggester/logs/events.ndjson (turn-level inputTokens/outputTokens/cost), but if those artifacts cannot be confidently mapped to the exact benchmark run, record input_tokens/output_tokens/cost as null and note the missing run-level linkage while still capturing duration/turns/tool_calls/files_read/quality. For blocked or non-executed trace rows, record duration_ms/turns/tool_calls/files_read as null and explain why the run did not occur."
+    }
+  }
+}

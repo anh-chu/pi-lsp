@@ -6,9 +6,15 @@
   "main": "src/index.ts",
   "scripts": {
     "check": "node --experimental-strip-types -e \"import('./src/index.ts').catch((err) => { console.error(err); process.exit(1); })\"",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "bench:harness": "node --experimental-strip-types benchmarks/automation/run-harness-benchmarks.mjs",
+    "bench:harness:pilot": "node --experimental-strip-types benchmarks/automation/run-harness-benchmarks.mjs --ids A-01,B-01,C-01,E-01",
+    "bench:live": "node benchmarks/automation/run-live-benchmarks.mjs",
+    "bench:live:pilot": "node benchmarks/automation/run-live-benchmarks.mjs --ids A-01,B-01,C-01,E-01",
+    "bench:live:full": "node benchmarks/automation/run-live-benchmarks.mjs"
   },
   "devDependencies": {
+    "@marcfargas/pi-test-harness": "^0.5.0",
     "@types/node": "^25.6.0"
   }
 }

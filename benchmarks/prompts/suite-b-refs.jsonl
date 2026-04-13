@@ -1,0 +1,3 @@
+{"id":"B-01","suite":"refs","cwd":"/home/sil/pi-extensions/pi-codesight","prompt":"Where is `registerCodesightTools` used? Group usages by file.","scoringNotes":"Correct grouped references preferred over vague summary."}
+{"id":"B-02","suite":"refs","cwd":"/home/sil/pi-extensions/pi-lsp","prompt":"Where is `rankContext` used? Group usages by file.","scoringNotes":"Exact references preferred. If none, should say none clearly."}
+{"id":"B-03","suite":"refs","cwd":"/home/sil/pi-extensions/pi-codesight","prompt":"Where is `runRefresh` called? Show likely usages.","scoringNotes":"Definition and usage should not be conflated."}

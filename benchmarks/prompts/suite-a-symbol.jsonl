@@ -1,0 +1,3 @@
+{"id":"A-01","suite":"symbol","cwd":"/home/sil/pi-extensions/pi-lsp","prompt":"Show `registerPiLspTools` implementation and explain what it registers.","scoringNotes":"Exact function slice preferred over whole-file summary."}
+{"id":"A-02","suite":"symbol","cwd":"/home/sil/pi-extensions/pi-lsp","prompt":"Show `getSymbolSlice` implementation.","scoringNotes":"Should resolve exact function, not broad file overview."}
+{"id":"A-03","suite":"symbol","cwd":"/home/sil/pi-extensions/pi-codesight","prompt":"Show `registerCodesightTools` implementation and summarize tool groups.","scoringNotes":"Exact function body preferred. Avoid broad whole-file read if possible."}

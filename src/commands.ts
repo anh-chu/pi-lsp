@@ -20,7 +20,11 @@ function emitSessionMessage(pi: any, kind: string, content: string, details: Rec
     customType: `pi-lsp-${kind}`,
     content,
     display: true,
-    details,
+    details: {
+      ...details,
+      benchmarkUsageNote:
+        'Benchmark rows should source input_tokens/output_tokens/cost from Pi session artifacts when available; otherwise record those fields as null and rely on duration/turns/tool_calls/files_read/quality.',
+    },
   });
 }
 

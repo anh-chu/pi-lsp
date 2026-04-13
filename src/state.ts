@@ -33,3 +33,10 @@ export function rememberQueriedSymbol(symbol: string) {
 export function setLastRankedItems(items: RankedItem[]) {
   state.lastRankedItems = items;
 }
+
+export function resetState() {
+  state.mentionedFiles = [];
+  state.readFiles = [];
+  state.queriedSymbols = [];
+  state.lastRankedItems = [];
+}
