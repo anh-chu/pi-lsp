@@ -1,194 +1,83 @@
 # pi-lsp
 
-Thin Pi extension for symbol-level code navigation.
+Pi extension for exact symbol navigation.
 
-## What this is
+`pi-lsp` helps Pi move from broad repo exploration to precise code-level jumps. It works best once symbol names, caller files, or call edges are already grounded.
 
-`pi-lsp` adds runtime precision on top of Pi's existing tooling.
+## What it does
 
-It helps Pi do these well:
-- read exact symbol definitions
-- find where symbol is defined
-- find where symbol is used
-- rank best next files or symbols for current task
+`pi-lsp` adds four navigation tools:
+- `pi_lsp_get_symbol` — read one exact symbol definition with minimal surrounding code
+- `pi_lsp_find_definition` — resolve exact owning file and location for known symbol
+- `pi_lsp_find_references` — group caller/use-site hits for known symbol
+- `pi_lsp_rank_context` — rank already-seen session context after evidence exists
 
-It is meant to complement repo-context tools like codesight.
+Practical split:
+- `codesight_*` = repo discovery and orientation
+- `pi_lsp_*` = exact symbol follow-up and code navigation
 
-- codesight = repo-level context
-- pi-lsp = symbol-level navigation
+## When to use it
 
-## What this is not
+Good fit:
+- exact symbol body reads
+- definition jumps
+- reference tracing
+- compound follow-up after repo discovery
 
-- not full repo-map system
-- not SoulForge replica
-- not custom parser/index platform
-- not refactor engine in v1
+Weak fit today:
+- first-step repo discovery
+- some debug prompts that stay repo-level
+- fresh-session ranking before any source evidence exists
 
-## Planned v1 tools
+## Current status
 
+Implemented:
 - `pi_lsp_get_symbol`
 - `pi_lsp_find_definition`
 - `pi_lsp_find_references`
 - `pi_lsp_rank_context`
+- slash commands `/symbol`, `/refs`, `/rank`
+- test coverage in `test/tools.test.ts` and related suites
 
-## Planned v1 commands
+## Benchmark snapshot
 
-- `/symbol <name> [fileHint]`
-- `/refs <name> [fileHint]`
-- `/rank [task text]`
+Milestone run: `gpt-5.4-mini`, fresh-session baseline vs treatment, 2026-04-13.
 
-## Why build this
+Setup:
+- baseline loaded `pi-codesight` only
+- treatment loaded `pi-codesight` + `pi-lsp`
+- artifact files: `benchmarks/results/live-benchmark-milestone-gpt54mini-postedits-2026-04-13.jsonl` and matching `-summary.md`
 
-LLMs often over-read code.
+Headline numbers:
+- direct `pi_lsp_*` adoption: `8/11` prompts
+- clean control: `E-01` used no unnecessary `pi_lsp_*` tools
+- strongest results: exact symbol/reference tasks
+- weaker results: ranking/debug rows and some compound rows
 
-Example bad flow:
-- read whole file
-- search around manually
-- read neighboring files
-- waste tokens on irrelevant code
+| prompt | suite | `pi_lsp_*` used | quality | tool calls | duration ms | input tokens | observation |
+|---|---|---|---|---:|---:|---:|---|
+| A-01 | symbol | yes | 2→2 | 6→2 | 22362→16601 | 12443→5551 | clear win |
+| A-02 | symbol | yes | 1→1 | 3→4 | 15353→10402 | 4216→9338 | mixed |
+| A-03 | symbol | yes | 1→1 | 4→3 | 25143→20458 | 7453→6189 | efficiency win |
+| B-01 | refs | yes | 2→2 | 9→7 | 16436→16828 | 8188→13694 | mixed |
+| B-02 | refs | yes | 1→1 | 10→6 | 20109→14861 | 24386→9611 | strong efficiency win |
+| B-03 | refs | yes | 1→1 | 11→4 | 31952→21051 | 11179→6505 | strong efficiency win |
+| C-01 | ranking | yes | 2→2 | 18→27 | 48311→68373 | 14018→22610 | adopted but regressed |
+| D-02 | debug | no | 2→2 | 26→32 | 81344→97444 | 39234→42638 | bypassed `pi_lsp_*` |
+| E-01 | control | no | 2→2 | 0→0 | 13234→3762 | 2185→5018 | clean control |
+| F-02 | compound | no | 2→2 | 25→21 | 37904→36790 | 18174→16842 | bypassed `pi_lsp_*` |
+| F-03 | compound | yes | 2→2 | 8→5 | 35406→33293 | 18109→15373 | efficiency win |
 
-Desired flow:
-- find symbol
-- read only definition body or small slice
-- inspect references if needed
-- rank next likely files from current task context
+What table says:
+- best value appears after symbol or caller grounding already exists
+- `pi-lsp` often cuts tool churn and token use on symbol/reference tasks
+- current data does not show universal latency wins
+- current data does not show universal gains across all prompt shapes
 
-## Design principles
+## Safe public claim
 
-1. Orchestrate first, reinvent last
-2. Use existing Pi tools before custom infra
-3. Prefer exact code slice over whole-file read
-4. Be honest about ambiguity and fallback
-5. Keep ranking deterministic
-6. Keep cache lightweight
+On stronger models, `pi-lsp` often reduces tool churn and token use on symbol/reference navigation tasks while preserving answer quality.
 
-## Backends
-
-Planned backend order:
-
-1. `lsp_navigation`
-2. `ast_grep_search`
-3. explicit failure with guidance
-
-`pi-lsp` should mostly shape and combine results from these tools.
-
-## Repository docs
-
-Implementation plan:
-- `./plan.md`
-
-Review template:
-- `./review.md`
-
-## References
-
-Pi extension docs:
-- `/home/sil/.local/share/fnm/node-versions/v24.14.1/installation/lib/node_modules/@mariozechner/pi-coding-agent/docs/extensions.md`
-
-Pi extension examples:
-- `/home/sil/.local/share/fnm/node-versions/v24.14.1/installation/lib/node_modules/@mariozechner/pi-coding-agent/examples/extensions/dynamic-tools.ts`
-- `/home/sil/.local/share/fnm/node-versions/v24.14.1/installation/lib/node_modules/@mariozechner/pi-coding-agent/examples/extensions/tools.ts`
-
-Reference repo for prior art:
-- `/home/sil/pi-extensions/pi-lens`
-
-## Intended implementation shape
-
-```text
-pi-lsp/
-  plan.md
-  review.md
-  README.md
-  src/
-    index.ts
-    tools.ts
-    commands.ts
-    state.ts
-    cache.ts
-    ranking.ts
-    symbols.ts
-    slices.ts
-    format.ts
-    types.ts
-  test/
-    helpers.ts
-    tools.test.ts
-    ranking.test.ts
-    cache.test.ts
-```
-
-## Suggested first milestone
-
-Build only:
-- `pi_lsp_get_symbol`
-- `/symbol`
-- minimal cache
-- tests for exact symbol slicing
-
-Why:
-- fastest path to visible value
-- lowest complexity
-- good base for definition/reference tools later
-
-## Status
-
-Implemented v1 baseline:
-- `pi_lsp_get_symbol` works
-- `pi_lsp_find_definition` works
-- `pi_lsp_find_references` works
-- `pi_lsp_rank_context` works
-
-## Benchmark scoring note
-
-When judging treatment runs, use current `src/` behavior and tests as the source of truth, not historical scaffold notes in `plan.md`.
-
-For treatment scoring, verify both:
-- the session actually used `pi_lsp_*` tools when the task called for exact navigation
-- the answer matches current tool behavior, including exact symbol lookup, definition lookup, reference grouping, backend/confidence/fallback reporting, ambiguity/failure handling, and next-step guidance metadata/text
-
-Practical checks:
-- confirm the runtime tool surface included `pi_lsp_get_symbol`, `pi_lsp_find_definition`, `pi_lsp_find_references`, and `pi_lsp_rank_context`
-- prefer evidence from tool traces or transcript tool-call logs over narrative claims
-- score against actual outputs produced by `src/tools.ts` and `src/symbols.ts`
-- use tests in `test/tools.test.ts` to validate expected behavior and wording instead of relying on stale scaffold claims
-- do not downgrade treatment quality based solely on `plan.md` statements like “not implemented yet” or “placeholder” when current code/tests contradict them
-- slash commands `/symbol`, `/refs`, `/rank` registered
-- tests pass
-- known gaps: runtime Pi integration should be verified against live built-in tool payloads; fallback reference output still could improve grouping/confidence signaling
-
-
-## Live benchmark snapshot
-
-> Milestone run: `gpt-5.4-mini`, fresh-session baseline vs treatment, 2026-04-13.
-> Baseline loaded `pi-codesight` only. Treatment loaded `pi-codesight` + `pi-lsp`.
-> Result artifacts: `benchmarks/results/live-benchmark-milestone-gpt54mini-postedits-2026-04-13.jsonl` and matching `-summary.md`.
-
-Headline results:
-- direct `pi_lsp_*` adoption in `8/11` prompts
-- control row `E-01` stayed clean: no unnecessary `pi_lsp_*` use
-- strongest wins came from exact symbol/reference tasks, not every ranking/debug task
-
-Best evidence rows:
-- `A-01`: quality `2 -> 2`, tools `6 -> 2`, duration `22362 -> 16601`, input tokens `12443 -> 5551`
-- `B-02`: quality `1 -> 1`, tools `10 -> 6`, duration `20109 -> 14861`, input tokens `24386 -> 9611`
-- `B-03`: quality `1 -> 1`, tools `11 -> 4`, duration `31952 -> 21051`, input tokens `11179 -> 6505`
-- `F-03`: quality `2 -> 2`, tools `8 -> 5`, duration `35406 -> 33293`, input tokens `18109 -> 15373`
-
-Mixed / weak rows:
-- `A-02`, `B-01`: adoption happened, but efficiency gains were mixed
-- `C-01`: direct adoption happened, but treatment over-explored and regressed on tools, time, and tokens
-- `D-02`, `F-02`: treatment often answered via broader repo reasoning without using `pi_lsp_*`
-
-Current takeaway:
-- `pi-lsp` shows strongest value after names or call edges are already grounded
-- best fit today: exact symbol body reads, definition jumps, reference tracing, compound follow-up after repo discovery
-- weaker fit today: first-step repo discovery, some debug prompts, and fresh-session ranking when no concrete evidence exists yet
-
-Safe claim:
-- on stronger models, `pi-lsp` often reduces tool churn and token use on symbol/reference navigation tasks while preserving answer quality
-
-Caveat:
-- current evidence does **not** support universal latency wins or universal improvement across all prompt shapes
 ## Tool usage guidance
 
 Use `codesight_*` first when the task is still repo-level or discovery-oriented, for example:
