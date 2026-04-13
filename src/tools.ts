@@ -61,13 +61,13 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_get_symbol',
     label: 'Pi LSP Get Symbol',
-    description: 'Read one exact grounded symbol definition with minimal code, plus next-step hints for follow-up tracing',
+    description: 'Read one exact grounded symbol definition with minimal code, plus jump-ready next-step hints for follow-up tracing',
     promptSnippet: 'Read one grounded symbol definition with minimal surrounding code',
     promptGuidelines: [
       'Use this tool after the exact function/class/type name is grounded from current source or repo context.',
-      'Prefer this over plain read once you know the exact symbol name, because it returns the minimal definition slice plus location/confidence metadata.',
+      'Prefer this over plain read once you know the exact symbol name, because it returns a minimal definition slice plus exact location/confidence and jump-ready next-step args.',
       'If exact symbol name is still uncertain, do not guess variants; use codesight_* or read current source first, then retry with a precise name or file hint.',
-      'Use the returned details.suggestedNext* fields to decide whether to inspect the body, trace references, or fall back to repo discovery.',
+      'After a successful lookup, follow the returned nextBestTool/nextBestArgs fields before falling back to broad reads or grep.',
     ],
     parameters: {
       type: 'object',
@@ -88,13 +88,13 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_find_definition',
     label: 'Pi LSP Find Definition',
-    description: 'Find the exact definition location for a grounded symbol, with safe next-step guidance for reading the implementation',
+    description: 'Find the exact definition location for a grounded symbol, with jump-ready next-step guidance for implementation reads',
     promptSnippet: 'Find where a grounded symbol is defined',
     promptGuidelines: [
       'Use this after the exact symbol name is known.',
-      'Prefer this over plain read when you only need the owning file/line first; it returns location/confidence metadata and a suggested next tool.',
+      'Prefer this over plain read when you only need the owning file/line first; it returns exact location/confidence plus nextBestTool/nextBestArgs for the next jump.',
       'Prefer codesight_* first for repo-level discovery or when you only know a feature area, route surface, schema area, or package name.',
-      'Use the returned details.suggestedNext* fields to decide whether to jump to pi_lsp_get_symbol, pi_lsp_find_references, or repo discovery.',
+      'After this resolves, usually follow the returned nextBestTool/nextBestArgs instead of broad file reads.',
     ],
     parameters: {
       type: 'object',
@@ -113,13 +113,13 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_find_references',
     label: 'Pi LSP Find References',
-    description: 'Find grounded symbol usages with grouped hits, confidence/fallback metadata, and safe next-step hints',
+    description: 'Find grounded symbol usages with grouped hits, prioritized caller files, and jump-ready next-step hints',
     promptSnippet: 'Find references or usages of a grounded symbol',
     promptGuidelines: [
       'Use this when tracing impact for an exact grounded symbol at code level.',
-      'Prefer this over plain read once the symbol is exact, because it groups usage hits and reports backend/confidence/fallback metadata.',
+      'Prefer this over grep or broad read once the symbol is exact, because it groups usages, prioritizes likely caller files, and returns nextBestTool/nextBestArgs for the best next hop.',
       'Do not use this as a first-pass repo exploration tool; prefer codesight_* first when callers or names are still unknown.',
-      'Use the returned details.suggestedNext* fields to decide whether to inspect one caller, ground the definition first, or fall back to repo discovery.',
+      'After this resolves, start with bestNextCallerFile / bestNextReadArgs before widening to more files.',
     ],
     parameters: {
       type: 'object',
@@ -139,13 +139,13 @@ export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_rank_context',
     label: 'Pi LSP Rank Context',
-    description: 'Prioritize files and symbols already observed in this session; not a repo discovery tool',
+    description: 'Prioritize files and symbols already observed in this session; never use for first-step repo discovery',
     promptSnippet: 'Prioritize already-seen session context for the current task',
     promptGuidelines: [
       'Use this only after concrete session evidence exists from this run, such as read files, mentioned files, or grounded symbol lookups.',
       'Do not use this as a first-step repo exploration tool in a fresh session. It ranks session memory only and cannot discover unseen code.',
       'If session evidence counts are all zero, inspect source with read or codesight_* first, then rerun ranking only if you need prioritization.',
-      'Treat any fresh-session result as a warning state, not as ranked repo context.',
+      'Treat any fresh-session result as a warning state that should delay ranking until after evidence exists.',
     ],
     parameters: {
       type: 'object',

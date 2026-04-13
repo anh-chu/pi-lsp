@@ -63,6 +63,9 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
       location?.confidence ? `- confidence: ${location.confidence}` : '- confidence: unknown',
       ambiguous ? '- ambiguity: multiple definition candidates found' : '- ambiguity: none',
       `- status: ${status}` ,
+      ok && nextBestTool ? `- next tool: ${nextBestTool}` : '- next tool: none',
+      ok && nextBestArgs ? `- next args: ${JSON.stringify(nextBestArgs)}` : '- next args: none',
+      ok && nextBestReason ? `- next reason: ${nextBestReason}` : '- next reason: n/a',
       ok
         ? '- next: call pi_lsp_get_symbol with the resolved file to read the exact implementation body'
         : (ambiguous
@@ -188,6 +191,9 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       `- files: ${groupedHits.length}` ,
       ok && bestNextCaller ? `- best next caller file: ${bestNextCaller.file}` : '- best next caller file: none',
       ok && bestNextCallerReason ? `- best next caller reason: ${bestNextCallerReason}` : '- best next caller reason: n/a',
+      ok && nextBestTool ? `- next tool: ${nextBestTool}` : '- next tool: none',
+      ok && nextBestArgs ? `- next args: ${JSON.stringify(nextBestArgs)}` : '- next args: none',
+      ok && bestNextReadArgs ? `- best next read args: ${JSON.stringify(bestNextReadArgs)}` : '- best next read args: none',
       ...topImpactFiles.map((item, index) => `- top likely impact ${index + 1}: ${item.file} (impact=${item.impactScore}, hits=${item.count}${item.topLine ? `, top line=${item.topLine}` : ''}) — ${item.reason}${item.topPreview ? ` — ${item.topPreview}` : ''}`),
       ...formatReferenceGroups(groupedHits),
       ok
