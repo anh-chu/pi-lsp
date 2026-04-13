@@ -156,6 +156,39 @@ Practical checks:
 - tests pass
 - known gaps: runtime Pi integration should be verified against live built-in tool payloads; fallback reference output still could improve grouping/confidence signaling
 
+
+## Live benchmark snapshot
+
+> Milestone run: `gpt-5.4-mini`, fresh-session baseline vs treatment, 2026-04-13.
+> Baseline loaded `pi-codesight` only. Treatment loaded `pi-codesight` + `pi-lsp`.
+> Result artifacts: `benchmarks/results/live-benchmark-milestone-gpt54mini-postedits-2026-04-13.jsonl` and matching `-summary.md`.
+
+Headline results:
+- direct `pi_lsp_*` adoption in `8/11` prompts
+- control row `E-01` stayed clean: no unnecessary `pi_lsp_*` use
+- strongest wins came from exact symbol/reference tasks, not every ranking/debug task
+
+Best evidence rows:
+- `A-01`: quality `2 -> 2`, tools `6 -> 2`, duration `22362 -> 16601`, input tokens `12443 -> 5551`
+- `B-02`: quality `1 -> 1`, tools `10 -> 6`, duration `20109 -> 14861`, input tokens `24386 -> 9611`
+- `B-03`: quality `1 -> 1`, tools `11 -> 4`, duration `31952 -> 21051`, input tokens `11179 -> 6505`
+- `F-03`: quality `2 -> 2`, tools `8 -> 5`, duration `35406 -> 33293`, input tokens `18109 -> 15373`
+
+Mixed / weak rows:
+- `A-02`, `B-01`: adoption happened, but efficiency gains were mixed
+- `C-01`: direct adoption happened, but treatment over-explored and regressed on tools, time, and tokens
+- `D-02`, `F-02`: treatment often answered via broader repo reasoning without using `pi_lsp_*`
+
+Current takeaway:
+- `pi-lsp` shows strongest value after names or call edges are already grounded
+- best fit today: exact symbol body reads, definition jumps, reference tracing, compound follow-up after repo discovery
+- weaker fit today: first-step repo discovery, some debug prompts, and fresh-session ranking when no concrete evidence exists yet
+
+Safe claim:
+- on stronger models, `pi-lsp` often reduces tool churn and token use on symbol/reference navigation tasks while preserving answer quality
+
+Caveat:
+- current evidence does **not** support universal latency wins or universal improvement across all prompt shapes
 ## Tool usage guidance
 
 Use `codesight_*` first when the task is still repo-level or discovery-oriented, for example:
