@@ -37,3 +37,21 @@ tmp/
 
 # package manager cache if created locally
 .npm/
+
+# Taskplane / Pi local runtime artifacts (machine-specific, do not commit)
+.pi/
+.worktrees/
+taskplane-tasks/
+
+# Generated benchmark artifacts
+benchmarks/results/live-runs/
+benchmarks/results/harness-benchmark-*.jsonl
+benchmarks/results/harness-benchmark-*-summary.md
+benchmarks/results/live-benchmark-*.jsonl
+benchmarks/results/live-benchmark-*-summary.md
+benchmarks/results/manual-pilot-*.jsonl
+benchmarks/results/manual-pilot-*-summary.md
+benchmarks/results/pilot-judge-sheet-*.md
+
+# Pi project-local packages (if using pi install -l)
+.pi/npm/
