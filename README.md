@@ -62,7 +62,7 @@ Headline numbers:
 | B-01 | refs | yes | 2→2 | 9→7 | 16436→16828 | 8188→13694 | mixed |
 | B-02 | refs | yes | 1→1 | 10→6 | 20109→14861 | 24386→9611 | strong efficiency win |
 | B-03 | refs | yes | 1→1 | 11→4 | 31952→21051 | 11179→6505 | strong efficiency win |
-| C-01 | ranking | yes | 2→2 | 18→27 | 48311→68373 | 14018→22610 | adopted but regressed |
+| C-01 | ranking | yes | 2→2 | 18→27 | 48311→68373 | 14018→22610 | wrong first tool; should start with `codesight_*` |
 | D-02 | debug | no | 2→2 | 26→32 | 81344→97444 | 39234→42638 | bypassed `pi_lsp_*` |
 | E-01 | control | no | 2→2 | 0→0 | 13234→3762 | 2185→5018 | clean control |
 | F-02 | compound | no | 2→2 | 25→21 | 37904→36790 | 18174→16842 | bypassed `pi_lsp_*` |

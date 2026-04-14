@@ -63,11 +63,12 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
       location?.confidence ? `- confidence: ${location.confidence}` : '- confidence: unknown',
       ambiguous ? '- ambiguity: multiple definition candidates found' : '- ambiguity: none',
       `- status: ${status}` ,
+      ok ? '- sufficient for simple lookup: yes' : '- sufficient for simple lookup: no',
       ok && nextBestTool ? `- next tool: ${nextBestTool}` : '- next tool: none',
       ok && nextBestArgs ? `- next args: ${JSON.stringify(nextBestArgs)}` : '- next args: none',
       ok && nextBestReason ? `- next reason: ${nextBestReason}` : '- next reason: n/a',
       ok
-        ? '- next: call pi_lsp_get_symbol with the resolved file to read the exact implementation body'
+        ? '- next: answer immediately if the resolved definition already satisfies the request; only call another pi_lsp_* tool when deeper tracing is explicitly needed'
         : (ambiguous
             ? '- next: pass a narrower file hint to pi_lsp_get_symbol or use codesight_* to disambiguate'
             : '- next: use codesight_* or current source to ground the exact symbol name before retrying'),
@@ -82,6 +83,7 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
       candidates: symbolResult.details.candidates,
       confidence: symbolResult.location?.confidence,
       owningFile,
+      sufficientForSimpleLookup: ok,
       nextBestTool,
       nextBestReason,
       nextBestArgs,
@@ -166,9 +168,9 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
     : undefined;
   const suggestedNextSteps = ok
     ? [
-        'Start with the best next caller file first for compound tasks, then widen only if needed.',
-        'Prefer the top preview line in that file before reading more surrounding code.',
-        'Use the remaining impact files as secondary follow-up sites if the first caller is not enough.',
+        'If grouped hits already answer a simple "where used?" question, stop and answer without another hop.',
+        'Start with the best next caller file only when the task explicitly needs deeper tracing, impact analysis, or caller inspection.',
+        'Use the remaining impact files as secondary follow-up sites only if the first caller is not enough.',
       ]
     : [
         'Call pi_lsp_find_definition first to verify the exact symbol and owning file.',
@@ -189,6 +191,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       `- limit: ${limit}` ,
       `- hits: ${hits.length}` ,
       `- files: ${groupedHits.length}` ,
+      ok ? '- sufficient for simple lookup: yes' : '- sufficient for simple lookup: no',
       ok && bestNextCaller ? `- best next caller file: ${bestNextCaller.file}` : '- best next caller file: none',
       ok && bestNextCallerReason ? `- best next caller reason: ${bestNextCallerReason}` : '- best next caller reason: n/a',
       ok && nextBestTool ? `- next tool: ${nextBestTool}` : '- next tool: none',
@@ -197,10 +200,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       ...topImpactFiles.map((item, index) => `- top likely impact ${index + 1}: ${item.file} (impact=${item.impactScore}, hits=${item.count}${item.topLine ? `, top line=${item.topLine}` : ''}) — ${item.reason}${item.topPreview ? ` — ${item.topPreview}` : ''}`),
       ...formatReferenceGroups(groupedHits),
       ok
-        ? '- status: references resolved with prioritized caller previews'
-        : '- status: no references found; verify the exact symbol or definition first',
-      ok
-        ? '- next: inspect the best next caller file with pi_lsp_get_symbol or a small targeted read'
+        ? '- next: answer immediately if grouped hits already satisfy the request; inspect the best next caller only when deeper tracing is explicitly needed'
         : '- next: call pi_lsp_find_definition first, or use codesight_* if the symbol/path is still not grounded',
     ]),
     details: {
@@ -218,6 +218,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       definitionFallback: resolution.definitionFallback,
       ok,
       owningFile,
+      sufficientForSimpleLookup: ok,
       nextBestTool,
       nextBestReason,
       nextBestArgs,

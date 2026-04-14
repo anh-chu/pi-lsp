@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -84,6 +83,9 @@ const resultsDir = path.resolve(packageRoot, 'benchmarks/results');
 const liveRunsDir = path.resolve(resultsDir, 'live-runs');
 const piLspExtension = path.resolve(packageRoot, 'src/index.ts');
 const codesightExtension = path.resolve(workspaceRoot, 'pi-codesight/src/index.ts');
+const piBin = process.env.PI_BIN || 'pi';
+const nodeBin = process.execPath;
+const runtimeBinDirs = Array.from(new Set([path.dirname(nodeBin), path.dirname(piBin)].filter(Boolean)));
 
 
 function fail(message) {
@@ -99,6 +101,8 @@ function parseArgs(argv) {
     model: null,
     thinking: 'medium',
     conditions: ['baseline', 'treatment'],
+    stack: 'codesight',
+    rowTimeoutMs: 180000,
     dryRun: false,
     keepArtifacts: true,
     list: false,
@@ -136,6 +140,17 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (arg === '--stack') {
+      args.stack = argv[index + 1] ?? 'codesight';
+      index += 1;
+      continue;
+    }
+    if (arg === '--row-timeout-ms') {
+      const value = Number(argv[index + 1] ?? '180000');
+      args.rowTimeoutMs = Number.isFinite(value) && value > 0 ? value : 180000;
+      index += 1;
+      continue;
+    }
     if (arg === '--dry-run') {
       args.dryRun = true;
       continue;
@@ -155,9 +170,11 @@ function parseArgs(argv) {
         'Options:',
         '  --ids A-01,B-01,C-01,E-01   Prompt ids to run',
         '  --conditions baseline,treatment  Conditions to run (default both)',
+        '  --stack codesight|raw        Benchmark stack (default codesight)',
         '  --provider <name>            Pi provider override',
         '  --model <pattern>            Pi model override',
         '  --thinking <level>           Thinking level (default medium)',
+        '  --row-timeout-ms <ms>        Per-row timeout in ms (default 180000)',
         '  --out <file.jsonl>           Output results file',
         '  --dry-run                    Print commands only; do not execute pi',
         '  --cleanup-artifacts          Remove per-run raw artifacts after summary write',
@@ -169,9 +186,11 @@ function parseArgs(argv) {
   return args;
 }
 
-function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+function validateStackOption(stack) {
+  if (stack === 'codesight' || stack === 'raw') return;
+  fail(`Unsupported --stack value: ${stack}. Use codesight or raw.`);
 }
+
 
 function readJsonl(filePath) {
   return fs.readFileSync(filePath, 'utf8')
@@ -279,87 +298,15 @@ function sessionUsageFromSessionFile(sessionPath) {
   };
 }
 
-function sessionUsageFromSuggester(sessionPath) {
-  if (!sessionPath) {
-    return {
-      input_tokens: null,
-      output_tokens: null,
-      cost: null,
-      note: 'session path missing; suggester usage unavailable.',
-      verified: false,
-    };
-  }
-
-  const sessionId = path.basename(sessionPath, '.jsonl').split('_').at(-1);
-  if (!sessionId) {
-    return {
-      input_tokens: null,
-      output_tokens: null,
-      cost: null,
-      note: 'session id could not be derived from session path.',
-      verified: false,
-    };
-  }
-
-  const suggesterDir = path.join(os.homedir(), '.pi', 'suggester', 'sessions', sessionId);
-  const metaPath = path.join(suggesterDir, 'meta.json');
-  const usagePath = path.join(suggesterDir, 'usage.json');
-  if (!fs.existsSync(metaPath) || !fs.existsSync(usagePath)) {
-    return {
-      input_tokens: null,
-      output_tokens: null,
-      cost: null,
-      note: 'suggester usage files missing; falling back to session JSONL usage if available.',
-      verified: false,
-    };
-  }
-
-  try {
-    const meta = readJson(metaPath);
-    const usage = readJson(usagePath);
-    const linked = typeof meta?.sessionPath === 'string'
-      ? path.resolve(meta.sessionPath) === path.resolve(sessionPath)
-      : true;
-    if (!linked) {
-      return {
-        input_tokens: null,
-        output_tokens: null,
-        cost: null,
-        note: 'suggester session linkage mismatch; ignoring suggester usage.',
-        verified: false,
-      };
-    }
-
-    return {
-      input_tokens: typeof usage?.input_tokens === 'number' ? usage.input_tokens : null,
-      output_tokens: typeof usage?.output_tokens === 'number' ? usage.output_tokens : null,
-      cost: typeof usage?.cost === 'number' ? usage.cost : null,
-      note: 'usage verified from suggester session artifacts.',
-      verified: true,
-    };
-  } catch (error) {
-    return {
-      input_tokens: null,
-      output_tokens: null,
-      cost: null,
-      note: `failed to parse suggester usage artifacts: ${error.message}`,
-      verified: false,
-    };
-  }
-}
-
 function sessionUsageFromPath(sessionPath) {
-  const primary = sessionUsageFromSuggester(sessionPath);
-  if (primary.verified) return primary;
-
-  const fallback = sessionUsageFromSessionFile(sessionPath);
-  if (fallback.verified) return fallback;
+  const usage = sessionUsageFromSessionFile(sessionPath);
+  if (usage.verified) return usage;
 
   return {
-    input_tokens: fallback.input_tokens,
-    output_tokens: fallback.output_tokens,
-    cost: fallback.cost,
-    note: [primary.note, fallback.note].filter(Boolean).join(' '),
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    cost: usage.cost,
+    note: usage.note,
     verified: false,
   };
 }
@@ -510,7 +457,6 @@ function scorePrompt(promptId, condition, answerText, breakdown) {
   if (promptId === 'F-02') {
     const anchored = hasAnchor(answer, 'src/tools.ts')
       && hasAnchor(answer, 'src/queries.ts', 'readRoutes')
-      && (/format\.ts/.test(answer) || /breakpoint/i.test(answer))
       && /breakpoint/i.test(answer);
     const invented = /likely|probably|api endpoint|database|in-memory data structures/i.test(answer);
     return {
@@ -526,9 +472,10 @@ function scorePrompt(promptId, condition, answerText, breakdown) {
 
 
   if (promptId === 'C-01') {
-    const relevant = /queries\.ts/.test(answer) && /readRoutes/.test(answer);
+    const relevant = /src\/queries\.ts|queries\.ts/.test(answer) && /readRoutes/.test(answer);
+    const focused = /src\/tools\.ts|tools\.ts/.test(answer);
     return {
-      quality_score: relevant ? 2 : (answer ? 1 : 0),
+      quality_score: relevant && focused ? 2 : (relevant ? 1 : (answer ? 1 : 0)),
       precision_score: null,
       note: condition === 'treatment'
         ? `Treatment ${directPiLspAdoption ? 'used direct' : usedPiLsp ? 'used rank-only' : 'did not use'} pi-lsp ranking path.`
@@ -565,17 +512,16 @@ function scorePrompt(promptId, condition, answerText, breakdown) {
   }
 
   if (promptId === 'F-03') {
-    const staged = /stage 1|stage 2|stage 3/i.test(answer);
+    const staged = /stage 1|stage 2/i.test(answer);
     const stage1Anchored = (/codesight_get_routes/.test(answer) || /registerCodesightTools/.test(answer))
       && /pi-codesight\/src\/tools\.ts/.test(answer);
     const stage2Anchored = /pi-codesight\/src\/queries\.ts/.test(answer) && /readRoutes\(/.test(answer);
-    const stage3Anchored = /pi-codesight\/test\/queries\.test\.ts|pi-codesight\/src\/index\.ts/.test(answer)
-      || (/pi-codesight\/test\/tools\.test\.ts/.test(answer) && /registerCodesightTools|codesight_get_routes/.test(answer));
+    const impactAnchored = /pi-codesight\/test\/queries\.test\.ts|pi-codesight\/src\/index\.ts|pi-codesight\/test\/tools\.test\.ts/.test(answer);
     const bannedPrimaryEvidence = /review\.md/.test(answer) || /plan\.md/.test(answer);
     const explicitUncertainty = /insufficient evidence/i.test(answer);
     const invented = /likely|probably|maybe|might want to|could inspect/i.test(answer) && !explicitUncertainty;
     const fileArgsOnly = !/pi-codesight\/src\/queries\.ts|pi-codesight\/test\/queries\.test\.ts|pi-codesight\/src\/index\.ts/.test(answer);
-    const anchored = staged && stage1Anchored && stage2Anchored && stage3Anchored && !bannedPrimaryEvidence && !fileArgsOnly;
+    const anchored = staged && stage1Anchored && stage2Anchored && impactAnchored && !bannedPrimaryEvidence && !fileArgsOnly;
     return {
       quality_score: invented ? 0 : anchored ? 2 : (staged && (stage1Anchored || stage2Anchored) && !fileArgsOnly ? 1 : 0),
       precision_score: condition === 'treatment' && usedPiLsp && anchored ? 2 : null,
@@ -598,9 +544,10 @@ function scorePrompt(promptId, condition, answerText, breakdown) {
     const repoGap = mentionsRepoSideGap(answer);
     const deniesRepoGap = mentionsNoRepoGap(answer);
     const stalePlaceholderClaim = /placeholder in tools\.ts|not implemented yet|placeholder behavior in tools\.ts/i.test(answer);
+    const bulletShape = /1\)|2\)|^- /m.test(answer);
     const quality = stalePlaceholderClaim
       ? 0
-      : repoEvidence && externalRuntime && repoGap && !deniesRepoGap
+      : repoEvidence && repoGap && !deniesRepoGap && (bulletShape || externalRuntime)
         ? 2
         : repoEvidence || externalRuntime
           ? 1
@@ -659,9 +606,9 @@ function buildPiArgs(condition, spec, options, sessionDir) {
     '--no-skills',
     '--no-prompt-templates',
     '--no-themes',
-    '--extension', codesightExtension,
   ];
 
+  if (options.stack === 'codesight') args.push('--extension', codesightExtension);
   if (condition === 'treatment') args.push('--extension', piLspExtension);
   if (options.provider) args.push('--provider', options.provider);
   if (options.model) args.push('--model', options.model);
@@ -670,11 +617,17 @@ function buildPiArgs(condition, spec, options, sessionDir) {
   return args;
 }
 
-function runPi(command, args, cwd, env, rawEventsPath, stderrPath) {
+function runPi(command, args, cwd, env, rawEventsPath, stderrPath, timeoutMs) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 5000).unref();
+    }, timeoutMs);
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString('utf8');
@@ -682,11 +635,15 @@ function runPi(command, args, cwd, env, rawEventsPath, stderrPath) {
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString('utf8');
     });
-    child.on('error', reject);
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
     child.on('close', (code, signal) => {
+      clearTimeout(timeout);
       fs.writeFileSync(rawEventsPath, stdout, 'utf8');
       fs.writeFileSync(stderrPath, stderr, 'utf8');
-      resolve({ code, signal, stdout, stderr });
+      resolve({ code, signal, stdout, stderr, timedOut });
     });
   });
 }
@@ -704,11 +661,13 @@ function parseEvents(stdout) {
   return events;
 }
 
-function summarizeRowGroup(rows, selectedIds) {
+function summarizeRowGroup(rows, selectedIds, options) {
+  const baselineLabel = options.stack === 'raw' ? 'raw pi only' : 'pi-codesight only';
+  const treatmentLabel = options.stack === 'raw' ? 'raw pi + pi-lsp' : 'pi-codesight + pi-lsp';
   const lines = [
     `# Live benchmark summary — ${new Date().toISOString().slice(0, 10)}`,
     '',
-    '> Fresh-session live runs via `pi --mode json --print` with explicit extension control. Token/cost fields are backfilled only when session linkage verifies against Pi suggester artifacts.',
+    `> Fresh-session live runs via \`pi --mode json --print\` with explicit extension control. Stack = \`${options.stack}\`. Token fields come from recorded session JSONL assistant usage blocks; cost is only as reliable as those usage blocks.`,
     '',
     '## Prompt-level comparison',
     '',
@@ -722,7 +681,7 @@ function summarizeRowGroup(rows, selectedIds) {
     lines.push(`| ${promptId} | ${baseline?.suite ?? treatment?.suite ?? 'unknown'} | ${baseline?.duration_ms ?? 'n/a'} | ${treatment?.duration_ms ?? 'n/a'} | ${baseline?.tool_calls ?? 'n/a'} | ${treatment?.tool_calls ?? 'n/a'} | ${baseline?.files_read ?? 'n/a'} | ${treatment?.files_read ?? 'n/a'} | ${baseline?.quality_score ?? 'n/a'} | ${treatment?.quality_score ?? 'n/a'} | ${baseline?.input_tokens ?? 'n/a'} | ${treatment?.input_tokens ?? 'n/a'} | ${baseline?.cost ?? 'n/a'} | ${treatment?.cost ?? 'n/a'} | ${treatment?.notes ?? baseline?.notes ?? ''} |`);
   }
 
-  lines.push('', summarizeTreatmentUsage(rows, selectedIds), '', '## Notes', '', '- `fresh_session` control: every run gets its own dedicated `--session-dir`.', '- baseline loads `pi-codesight` only.', '- treatment loads `pi-codesight` + `pi-lsp`.', '- raw JSON event streams and stderr logs live under `benchmarks/results/live-runs/` unless cleanup requested.');
+  lines.push('', summarizeTreatmentUsage(rows, selectedIds), '', '## Notes', '', '- `fresh_session` control: every run gets its own dedicated `--session-dir`.', `- baseline loads ${baselineLabel}.`, `- treatment loads ${treatmentLabel}.`, '- raw JSON event streams and stderr logs live under `benchmarks/results/live-runs/` unless cleanup requested.');
   return lines.join('\n') + '\n';
 }
 
@@ -777,6 +736,7 @@ async function runOne(promptId, condition, spec, options) {
       timestamp: timestamp.toISOString(),
       model: options.model ?? 'default-live-model',
       thinking_level: options.thinking,
+      stack: options.stack,
       input_tokens: null,
       output_tokens: null,
       cost: null,
@@ -790,17 +750,22 @@ async function runOne(promptId, condition, spec, options) {
       precision_score: null,
       answer_text: null,
       session_path: null,
-      notes: `DRY RUN only. Command recorded at ${commandRecordPath}`,
+      notes: `DRY RUN only. Stack=${options.stack}. Command recorded at ${commandRecordPath}`,
     };
   }
 
+  const envPath = [
+    ...runtimeBinDirs,
+    process.env.PATH ?? '',
+  ].filter(Boolean).join(path.delimiter);
   const env = {
     ...process.env,
+    PATH: envPath,
     PI_OFFLINE: process.env.PI_OFFLINE ?? '1',
   };
 
   const startedAt = Date.now();
-  const outcome = await runPi('pi', args, spec.cwd, env, rawEventsPath, stderrPath);
+  const outcome = await runPi(piBin, args, spec.cwd, env, rawEventsPath, stderrPath, options.rowTimeoutMs);
   const duration = Date.now() - startedAt;
   const events = parseEvents(outcome.stdout);
   const answerText = finalAnswerText(events);
@@ -819,6 +784,7 @@ async function runOne(promptId, condition, spec, options) {
     timestamp: timestamp.toISOString(),
     model: finalAssistantMessage(events)?.model ?? options.model ?? 'default-live-model',
     thinking_level: options.thinking,
+    stack: options.stack,
     input_tokens: usage.input_tokens,
     output_tokens: usage.output_tokens,
     cost: usage.cost,
@@ -839,7 +805,9 @@ async function runOne(promptId, condition, spec, options) {
   };
 
   if (outcome.code !== 0) {
-    baseRow.notes = `LIVE RUN FAILED. exit=${outcome.code} signal=${outcome.signal ?? 'none'}. stderr: ${outcome.stderr.trim() || 'none'}`;
+    baseRow.notes = outcome.timedOut
+      ? `LIVE RUN FAILED. timeout=${options.rowTimeoutMs}ms signal=${outcome.signal ?? 'none'}. stderr: ${outcome.stderr.trim() || 'none'}`
+      : `LIVE RUN FAILED. exit=${outcome.code} signal=${outcome.signal ?? 'none'}. stderr: ${outcome.stderr.trim() || 'none'}`;
     return baseRow;
   }
 
@@ -848,11 +816,13 @@ async function runOne(promptId, condition, spec, options) {
   baseRow.quality_score = scoring.quality_score;
   baseRow.precision_score = scoring.precision_score;
   const treatmentUsage = condition === 'treatment' ? classifyTreatmentPiLspUsage(breakdown) : null;
+  const baselineLabel = options.stack === 'raw' ? 'raw pi only' : 'codesight only';
+  const treatmentLabel = options.stack === 'raw' ? 'raw pi + pi-lsp' : 'codesight + pi-lsp';
   baseRow.notes = [
     'fresh_session live run.',
     condition === 'treatment'
-      ? `treatment tools loaded: codesight + pi-lsp. usage_class=${treatmentUsage.usage_class}. direct_calls=${treatmentUsage.directAdoptionCalls}. context_calls=${treatmentUsage.treatmentContextCalls}.`
-      : 'baseline tools loaded: codesight only.',
+      ? `treatment tools loaded: ${treatmentLabel}. usage_class=${treatmentUsage.usage_class}. direct_calls=${treatmentUsage.directAdoptionCalls}. context_calls=${treatmentUsage.treatmentContextCalls}.`
+      : `baseline tools loaded: ${baselineLabel}.`,
     scoring.note,
     misuseSummary,
     usage.note,
@@ -867,6 +837,7 @@ async function main() {
   fs.mkdirSync(liveRunsDir, { recursive: true });
 
   const options = parseArgs(process.argv.slice(2));
+  validateStackOption(options.stack);
   const catalog = loadPromptCatalog();
   const selectedIds = options.ids ?? promptIdsFromCatalog(catalog);
 
@@ -893,7 +864,7 @@ async function main() {
     : path.join(resultsDir, `live-benchmark-${new Date().toISOString().slice(0, 10)}.jsonl`);
   const summaryPath = outPath.replace(/\.jsonl$/, '-summary.md');
   fs.writeFileSync(outPath, rows.map((row) => JSON.stringify(row)).join('\n') + '\n', 'utf8');
-  fs.writeFileSync(summaryPath, summarizeRowGroup(rows, selectedIds), 'utf8');
+  fs.writeFileSync(summaryPath, summarizeRowGroup(rows, selectedIds, options), 'utf8');
 
   if (!options.keepArtifacts) {
     for (const row of rows) {

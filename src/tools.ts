@@ -67,7 +67,8 @@ export function registerPiLspTools(pi: any) {
       'Use this tool after the exact function/class/type name is grounded from current source or repo context.',
       'Prefer this over plain read once you know the exact symbol name, because it returns a minimal definition slice plus exact location/confidence and jump-ready next-step args.',
       'If exact symbol name is still uncertain, do not guess variants; use codesight_* or read current source first, then retry with a precise name or file hint.',
-      'After a successful lookup, follow the returned nextBestTool/nextBestArgs fields before falling back to broad reads or grep.',
+      'If returned definition slice already answers the request, stop and answer immediately instead of taking another hop.',
+      'Use returned nextBestTool/nextBestArgs only when the task explicitly requires deeper tracing beyond this symbol body.',
     ],
     parameters: {
       type: 'object',
@@ -94,7 +95,8 @@ export function registerPiLspTools(pi: any) {
       'Use this after the exact symbol name is known.',
       'Prefer this over plain read when you only need the owning file/line first; it returns exact location/confidence plus nextBestTool/nextBestArgs for the next jump.',
       'Prefer codesight_* first for repo-level discovery or when you only know a feature area, route surface, schema area, or package name.',
-      'After this resolves, usually follow the returned nextBestTool/nextBestArgs instead of broad file reads.',
+      'If returned location already answers the request, answer immediately instead of chaining another pi_lsp_* call.',
+      'Do not follow nextBestTool automatically on simple lookup questions; use one precise pi_lsp_* call first and chain only when deeper tracing is required.',
     ],
     parameters: {
       type: 'object',
@@ -119,7 +121,8 @@ export function registerPiLspTools(pi: any) {
       'Use this when tracing impact for an exact grounded symbol at code level.',
       'Prefer this over grep or broad read once the symbol is exact, because it groups usages, prioritizes likely caller files, and returns nextBestTool/nextBestArgs for the best next hop.',
       'Do not use this as a first-pass repo exploration tool; prefer codesight_* first when callers or names are still unknown.',
-      'After this resolves, start with bestNextCallerFile / bestNextReadArgs before widening to more files.',
+      'If grouped hits already answer a simple "where used?" question, stop and answer without taking another hop.',
+      'Do not follow nextBestTool automatically on simple lookup questions; start with one precise pi_lsp_* call and chain only when the task explicitly asks for deeper tracing or caller inspection.',
     ],
     parameters: {
       type: 'object',
