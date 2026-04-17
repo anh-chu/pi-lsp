@@ -1,139 +1,228 @@
 # pi-lsp
+Grounded code navigation companion for Pi.
 
-Pi extension for exact symbol navigation.
+`pi-lsp` is the navigation policy layer. It helps Pi decide the next code-intelligence hop after repo area, file, or symbol is grounded, and it hands off to the right tool family, from repo discovery to exact-symbol navigation to raw IDE-style LSP ops. In practice this means fewer wasted hops on exact symbol and reference tasks, and better first-move decisions on compound debug or feature work.
 
-`pi-lsp` helps Pi move from broad repo exploration to precise code-level jumps. It works best once symbol names, caller files, or call edges are already grounded.
+## Why it exists
 
-## What it does
+Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discovery, grounded symbol inspection, usage tracing, semantic IDE ops, and final answer. Different tools win at different phases.
 
-`pi-lsp` adds four navigation tools:
-- `pi_lsp_get_symbol` — read one exact symbol definition with minimal surrounding code
-- `pi_lsp_find_definition` — resolve exact owning file and location for known symbol
-- `pi_lsp_find_references` — group caller/use-site hits for known symbol
-- `pi_lsp_rank_context` — rank already-seen session context after evidence exists
+`pi-lsp` keeps that decision sharp so the agent:
 
-Practical split:
-- `codesight_*` = repo discovery and orientation
-- `pi_lsp_*` = exact symbol follow-up and code navigation
+- does not jump to symbol lookups before grounding
+- does not fall back to broad `read` once a symbol is already known
+- does not repeat work when the session already has enough evidence
+- hands off semantic IDE work to raw `lsp_navigation`
 
-## When to use it
+## Value props
 
-Good fit:
-- exact symbol body reads
-- definition jumps
-- reference tracing
-- compound follow-up after repo discovery
+- **Grounded symbol navigation**, minimal slices, definition location, grouped references.
+- **Navigation planner**, bounded 1-4 hop plan across `codesight_*`, `pi_lsp_*`, `lsp_navigation`, `read`, and answer-now.
+- **Session-aware reuse**, resolved definitions, top caller files, and queried symbols persist inside the session.
+- **Answer-now short-circuit**, planner can return a direct answer when evidence already suffices.
+- **Tight steering**, tool descriptions and intent classifier target agent subtask shape, not literal user wording.
+- **Complements, not replaces**, works alongside `pi-codesight` for discovery and `pi-lens` for diagnostics.
 
-Weak fit today:
-- first-step repo discovery
-- some debug prompts that stay repo-level
-- fresh-session ranking before any source evidence exists
+## Ecosystem
 
-## Current status
+Recommended stack:
 
-Implemented:
-- `pi_lsp_get_symbol`
-- `pi_lsp_find_definition`
-- `pi_lsp_find_references`
-- `pi_lsp_rank_context`
-- slash commands `/symbol`, `/refs`, `/rank`
-- test coverage in `test/tools.test.ts` and related suites
+- **`pi-codesight`**, repo discovery. Routes, schema, subsystems, env, hot files.
+- **`pi-lsp`** (this), grounded navigation and planner.
+- **`pi-lens`**, diagnostics, autofix, hover, signature help, implementation, call hierarchy, rename, advanced cursor-based LSP.
+- **Built-ins**, `read`, `grep`, `find`, `lsp_navigation`, `ast_grep_search`.
 
-## Benchmark snapshot
+Rule of thumb:
 
-Milestone run: `gpt-5.4-mini`, fresh-session baseline vs treatment, 2026-04-13.
+- broad or fresh task -> `codesight_*` or `read`
+- grounded symbol, caller, or usage task -> `pi_lsp_*`
+- IDE-style semantic op -> raw `lsp_navigation`
+- cheap local confirmation in already-open file -> `read`
+- undecided or compound task -> `pi_lsp_plan_navigation`
 
-Setup:
-- baseline loaded `pi-codesight` only
-- treatment loaded `pi-codesight` + `pi-lsp`
-- artifact files: `benchmarks/results/live-benchmark-milestone-gpt54mini-postedits-2026-04-13.jsonl` and matching `-summary.md`
+## Guidance for users
 
-Headline numbers:
-- direct `pi_lsp_*` adoption: `8/11` prompts
-- clean control: `E-01` used no unnecessary `pi_lsp_*` tools
-- strongest results: exact symbol/reference tasks
-- weaker results: ranking/debug rows and some compound rows
+Users do not need to learn any tool name. Just ask naturally.
 
-| prompt | suite | `pi_lsp_*` used | quality | tool calls | duration ms | input tokens | observation |
-|---|---|---|---|---:|---:|---:|---|
-| A-01 | symbol | yes | 2→2 | 6→2 | 22362→16601 | 12443→5551 | clear win |
-| A-02 | symbol | yes | 1→1 | 3→4 | 15353→10402 | 4216→9338 | mixed |
-| A-03 | symbol | yes | 1→1 | 4→3 | 25143→20458 | 7453→6189 | efficiency win |
-| B-01 | refs | yes | 2→2 | 9→7 | 16436→16828 | 8188→13694 | mixed |
-| B-02 | refs | yes | 1→1 | 10→6 | 20109→14861 | 24386→9611 | strong efficiency win |
-| B-03 | refs | yes | 1→1 | 11→4 | 31952→21051 | 11179→6505 | strong efficiency win |
-| C-01 | ranking | yes | 2→2 | 18→27 | 48311→68373 | 14018→22610 | wrong first tool; should start with `codesight_*` |
-| D-02 | debug | no | 2→2 | 26→32 | 81344→97444 | 39234→42638 | bypassed `pi_lsp_*` |
-| E-01 | control | no | 2→2 | 0→0 | 13234→3762 | 2185→5018 | clean control |
-| F-02 | compound | no | 2→2 | 25→21 | 37904→36790 | 18174→16842 | bypassed `pi_lsp_*` |
-| F-03 | compound | yes | 2→2 | 8→5 | 35406→33293 | 18109→15373 | efficiency win |
+- “Debug this failing auth flow.”
+- “Fix the route parser bug.”
+- “Implement a retry policy in the sync job.”
+- “Where is this function actually used?”
+- “Show me the implementation of X.”
 
-What table says:
-- best value appears after symbol or caller grounding already exists
-- `pi-lsp` often cuts tool churn and token use on symbol/reference tasks
-- current data does not show universal latency wins
-- current data does not show universal gains across all prompt shapes
+The agent picks the right tool. Slash commands are available for direct control.
 
-## Safe public claim
+## Agent tools
 
-On stronger models, `pi-lsp` often reduces tool churn and token use on symbol/reference navigation tasks while preserving answer quality.
+All tools are registered on Pi load.
 
-## Tool usage guidance
+### `pi_lsp_get_symbol`
+Read one exact grounded symbol definition with minimal code.
+- Input: `symbol` (required), `file`, `includeBody`, `contextLines`.
+- Best when current subtask is minimal implementation inspection.
+- Returns: compact slice, location, owning file, jump-ready next-step hints.
 
-Use `codesight_*` first when the task is still repo-level or discovery-oriented, for example:
-- narrowing to a package/subsystem
-- identifying route/schema/env/hot-file surfaces
-- finding likely files before exact symbol names are known
+### `pi_lsp_find_definition`
+Find the exact definition location of a grounded symbol.
+- Input: `symbol` (required), `file`.
+- Best when the subtask is resolving the owning file or line.
+- Returns: file, line, character, next-step hints.
 
-Use `pi_lsp_*` after names are grounded from current source, for example:
-- reading one exact symbol body
-- locating the exact definition for a known symbol
-- checking callers/references for a known symbol
+### `pi_lsp_find_references`
+Find usages of a grounded symbol, grouped by file, caller file prioritized.
+- Input: `symbol` (required), `file`, `limit`.
+- Best when the subtask is caller tracing, usage tracing, or impact.
+- Returns: grouped hits, top caller file, next-step hints.
 
-Practical rule:
-- `codesight_*` first for repo/path discovery
-- `pi_lsp_*` second for exact symbol/caller follow-up
+### `pi_lsp_rank_context`
+Prioritize files and symbols already observed inside this Pi session.
+- Input: `query`, `limit`.
+- Does not explore the repo. Ranks in-memory session state only.
+- Returns: ranked items, session state counts, guidance, fresh-session warning if empty.
 
-Fresh-session behavior for `pi_lsp_rank_context`:
-- when session evidence counts are all zero, the tool returns a warning state with no ranked items
-- the current query is shown as metadata only and is not echoed back as a ranked candidate
-- tool details include `freshSession: true` and `shouldRerunAfterEvidence: true` so callers can defer or down-rank the result
-- safest next step is to read source or use `codesight_*`, then rerun ranking only if prioritization is still needed
+### `pi_lsp_plan_navigation`
+Plan the next 1-4 navigation hops.
+- Input: `task` (required), `symbol`, `file`, `mode`, `limit`.
+- Returns: intent, best route, next tool, next args, fallback steps, stop conditions, evidence snapshot.
+- Possible routes: `codesight`, `pi_lsp`, `lsp_navigation`, `read`, `answer`.
 
-## Failure-message guidance
+## Slash commands
 
-`pi_lsp_get_symbol` should fail honestly when the requested name does not match current source exactly.
-Avoid vague misses that invite repeated guessed-name retries.
-Current failure guidance now points the model to:
-- verify the exact exported symbol name first
-- use `codesight_*` for repo-level discovery when the symbol/path is not yet grounded
-- retry `pi_lsp_get_symbol` only after the symbol name or file hint is precise
+Slash commands are a direct control surface. Useful in interactive Pi sessions.
 
-## Definition/reference follow-up cues
+- `/symbol <name> [fileHint]`, run `pi_lsp_get_symbol`.
+- `/refs <name> [fileHint]`, run `pi_lsp_find_references`.
+- `/rank <task>`, run `pi_lsp_rank_context`.
+- `/nav <task>`, run `pi_lsp_plan_navigation`.
 
-`pi_lsp_find_definition` and `pi_lsp_find_references` now try to make the next safe step obvious once a symbol is grounded.
+After manifest changes, run `pi update` or reinstall the package so new commands register.
 
-They explicitly return:
-- concise status text in `content`
-- backend/confidence/fallback details for trust calibration
-- concise jump metadata in `details.owningFile`, `details.nextBestTool`, `details.nextBestReason`, and `details.nextBestArgs`
-- legacy-compatible `details.suggestedNext*` aliases with the same values
-- `details.suggestedNextSteps` for recovery when the result is ambiguous, empty, or needs a body read next
+## Schema
 
-Practical intent:
-- prefer `pi_lsp_find_definition` over plain read when you need the owning file/line first
-- prefer `pi_lsp_find_references` over plain read when you need grouped caller/use-site evidence first
-- use `pi_lsp_get_symbol` next when definition/reference output has already grounded the relevant file or symbol
+### Planner result
 
-`pi_lsp_find_references` now also prioritizes compound-task follow-up more aggressively without changing lookup scope or backend semantics.
+```ts
+type PlannerStatus = 'needs-discovery' | 'grounded-next-hop' | 'needs-narrowing' | 'answer-now';
+type ToolRouteFamily = 'codesight' | 'pi_lsp' | 'lsp_navigation' | 'read' | 'answer';
 
-Extra actionable fields now include:
-- `details.bestNextCallerFile` and `details.bestNextCallerReason` to identify the strongest immediate caller/use-site file
-- `details.bestNextReadArgs` to suggest a minimal targeted read starting line for that caller file
-- `details.topImpactFiles` with the top grouped files ranked by hit count, non-test preference, and stronger preview context
-- stronger text output ordering so the best caller file, top likely impact files, and top preview lines appear before the rest of the grouped file list
+interface NavigationPlan {
+  intent: 'inspect' | 'define' | 'trace' | 'impact' | 'debug' | 'discover' | 'explain';
+  status: PlannerStatus;
+  confidence: 'low' | 'medium' | 'high';
+  bestRoute: { primary: ToolRouteFamily; toolName?: string; args?: Record<string, unknown>; reason: string };
+  steps: NavigationStep[];
+  fallbackSteps: NavigationStep[];
+  stopWhen: string[];
+  nextTool?: string;
+  nextArgs?: Record<string, unknown>;
+  evidence: EvidenceSnapshot;
+  freshSession: boolean;
+}
+```
 
-Practical intent:
-- start with the first caller file for compound edits, bug traces, or impact analysis
-- use the top preview line as the default first jump inside that file
-- keep remaining impact files as secondary follow-up sites rather than scanning the whole grouped list first
+### Symbol result
+
+```ts
+interface SymbolSliceResult {
+  content: string;
+  details: {
+    symbol: string;
+    location: { file: string; line: number; character?: number };
+    owningFile: string;
+    body?: string;
+    nextBestTool?: string;
+    nextBestArgs?: Record<string, unknown>;
+    nextBestReason?: string;
+  };
+}
+```
+
+### Reference result
+
+```ts
+interface ReferenceResult {
+  content: string;
+  details: {
+    symbol: string;
+    groupedHits: Array<{ file: string; count: number; line: number; snippet?: string }>;
+    bestNextCallerFile?: string;
+    bestNextReadArgs?: { path: string };
+    topImpactFiles: Array<{ file: string; score: number }>;
+    nextBestTool?: string;
+    nextBestArgs?: Record<string, unknown>;
+  };
+}
+```
+
+## Usage
+
+### Natural prompts
+
+```text
+Debug why route parsing mishandles trailing slashes.
+```
+Agent path: discovery first, then grounded symbol hop, then reads minimal code.
+
+```text
+Show the implementation of registerPiLspTools.
+```
+Agent path: `pi_lsp_get_symbol`.
+
+```text
+Where is registerPiLspTools used across the repo?
+```
+Agent path: `pi_lsp_find_references`.
+
+```text
+Where is registerPiLspTools defined?
+```
+Agent path: `pi_lsp_find_definition`, or answer-now if already grounded in session.
+
+### Planner-first
+
+```text
+Plan the next navigation move to debug a possible tool registration issue.
+```
+Agent path: `pi_lsp_plan_navigation`. Returns next tool + args or answer-now.
+
+### Interactive slash
+
+```
+/symbol registerPiLspTools src/tools.ts
+/refs registerPiLspTools src/tools.ts
+/nav show exact definition location for registerPiLspTools
+/rank changes related to tool registration
+```
+
+## Install
+
+```bash
+npm install pi-lsp
+```
+
+Or install as a Pi package from git. Pi loads the extension through `package.json.pi.extensions`. After manifest changes, run `pi update` or reinstall.
+
+## User-exposed skills
+
+No separate skill bundle ships with `pi-lsp` yet. Planner guidance is already embedded in the tool descriptions and surfaced through `/nav`.
+
+Recommended companion skills from the Pi ecosystem:
+
+- `lsp-navigation`, for raw IDE ops through `lsp_navigation`.
+- `ast-grep`, for structural code search and edits.
+- `structured-return`, for compact test and build outputs.
+- `commit` and `github`, for git and PR flow after edits.
+
+## Configuration
+
+`pi-lsp` reads no external configuration. Internal caching is mtime-scoped per file.
+
+## Docs
+
+- `docs/TOOL-CHOOSER.md`, which tool fits which subtask.
+- `docs/WORKFLOWS.md`, canonical debug, fix, and feature flows.
+- `CHANGELOG.md`, version history.
+
+## License
+
+MIT. See `LICENSE`.

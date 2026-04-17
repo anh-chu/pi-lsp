@@ -8,7 +8,7 @@ import { resetState } from '../../src/state.ts';
 
 
 function classifyTreatmentPiLspUsage(breakdown = {}) {
-  const directAdoptionTools = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references'];
+  const directAdoptionTools = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_plan_navigation'];
   const treatmentContextTools = ['pi_lsp_rank_context'];
   const directAdoptionCalls = directAdoptionTools.reduce((sum, toolName) => sum + (breakdown[toolName] ?? 0), 0);
   const treatmentContextCalls = treatmentContextTools.reduce((sum, toolName) => sum + (breakdown[toolName] ?? 0), 0);
@@ -272,7 +272,7 @@ function scoreCase(promptId, condition, run) {
   const treatmentUsage = classifyTreatmentPiLspUsage(run.tool_call_breakdown);
   const usedPiLsp = treatmentUsage.totalPiLspCalls > 0;
   if (promptId === 'A-01') {
-    const hasAllTools = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context'].every((name) => answer.includes(name));
+    const hasAllTools = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context', 'pi_lsp_plan_navigation'].every((name) => answer.includes(name));
     return {
       quality_score: hasAllTools ? 2 : 1,
       precision_score: condition === 'treatment' && usedPiLsp ? 2 : 1,

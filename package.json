@@ -1,9 +1,43 @@
 {
   "name": "pi-lsp",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
+  "description": "Exact symbol navigation companion for Pi, built to sit between pi-codesight discovery and pi-lens raw LSP operations.",
   "type": "module",
   "main": "src/index.ts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anh-chu/pi-lsp.git"
+  },
+  "homepage": "https://github.com/anh-chu/pi-lsp#readme",
+  "bugs": {
+    "url": "https://github.com/anh-chu/pi-lsp/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "lsp",
+    "navigation",
+    "codesight",
+    "pi-lens",
+    "symbols"
+  ],
+  "files": [
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "pi": {
+    "extensions": [
+      "src/index.ts"
+    ]
+  },
   "scripts": {
     "check": "node --experimental-strip-types -e \"import('./src/index.ts').catch((err) => { console.error(err); process.exit(1); })\"",
     "test": "node --experimental-strip-types --test test/*.test.ts",

@@ -17,7 +17,7 @@ test('registers expected pi-lsp tools', () => {
   registerPiLspTools(pi);
   assert.deepEqual(
     pi.tools.map((tool) => tool.name),
-    ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context'],
+    ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context', 'pi_lsp_plan_navigation'],
   );
 });
 
@@ -27,6 +27,7 @@ test('registers expected pi-lsp commands', () => {
   assert.equal(typeof pi.commands.symbol.handler, 'function');
   assert.equal(typeof pi.commands.refs.handler, 'function');
   assert.equal(typeof pi.commands.rank.handler, 'function');
+  assert.equal(typeof pi.commands.nav.handler, 'function');
 });
 
 test('symbol command emits result message', async () => {

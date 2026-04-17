@@ -19,7 +19,7 @@
   "properties": {
     "run_id": { "type": "string" },
     "condition": { "type": "string", "enum": ["baseline", "treatment"] },
-    "suite": { "type": "string", "enum": ["symbol", "refs", "ranking", "debug", "control"] },
+    "suite": { "type": "string", "enum": ["symbol", "refs", "ranking", "debug", "control", "compound"] },
     "prompt_id": { "type": "string" },
     "cwd": { "type": "string" },
     "timestamp": { "type": "string" },
@@ -28,47 +28,31 @@
     "input_tokens": { "type": ["number", "null"] },
     "output_tokens": { "type": ["number", "null"] },
     "cost": { "type": ["number", "null"] },
-    "duration_ms": {
-      "type": ["number", "null"],
-      "description": "Elapsed time in milliseconds. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
-    },
-    "turns": {
-      "type": ["number", "null"],
-      "description": "Conversation turn count. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
-    },
-    "tool_calls": {
-      "type": ["number", "null"],
-      "description": "Total tool calls observed for the run. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
-    },
-    "tool_call_breakdown": {
-      "type": "object",
-      "additionalProperties": { "type": "number" }
-    },
-    "files_read": {
-      "type": ["number", "null"],
-      "description": "Total files read during the run. Use null only for blocked or otherwise non-executed trace rows where no real run occurred. Real executions should record a numeric value."
-    },
+    "duration_ms": { "type": ["number", "null"] },
+    "turns": { "type": ["number", "null"] },
+    "tool_calls": { "type": ["number", "null"] },
+    "tool_call_breakdown": { "type": "object", "additionalProperties": { "type": "number" } },
+    "files_read": { "type": ["number", "null"] },
     "bytes_read": { "type": ["number", "null"] },
     "quality_score": { "type": "number", "minimum": 0, "maximum": 2 },
     "precision_score": { "type": ["number", "null"], "minimum": 0, "maximum": 2 },
+    "first_useful_hop_score": { "type": ["number", "null"], "minimum": 0, "maximum": 2 },
+    "route_correctness_score": { "type": ["number", "null"], "minimum": 0, "maximum": 2 },
+    "control_cleanliness_score": { "type": ["number", "null"], "minimum": 0, "maximum": 2 },
+    "wrong_first_tool": { "type": ["boolean", "null"] },
+    "planner_route_correct": { "type": ["boolean", "null"] },
+    "control_distraction": { "type": ["boolean", "null"] },
+    "unnecessary_broad_read_penalty": { "type": ["number", "null"] },
+    "first_tool": { "type": ["string", "null"] },
+    "tool_family_sequence": { "type": ["array", "null"], "items": { "type": "string" } },
     "answer_text": { "type": ["string", "null"] },
     "session_path": { "type": ["string", "null"] },
     "treatment_usage_class": {
       "type": ["string", "null"],
-      "enum": ["direct_adoption", "treatment_context_only", "treatment_loaded_but_unused", null],
-      "description": "Treatment-only classification for pi-lsp usage in the run: direct symbol/definition/reference adoption, rank-context-only usage, or treatment loaded but bypassed."
+      "enum": ["direct_adoption", "treatment_context_only", "treatment_loaded_but_unused", null]
     },
-    "treatment_direct_adoption_calls": {
-      "type": ["number", "null"],
-      "description": "Count of direct pi-lsp adoption calls (`pi_lsp_get_symbol`, `pi_lsp_find_definition`, `pi_lsp_find_references`) in treatment runs."
-    },
-    "treatment_context_calls": {
-      "type": ["number", "null"],
-      "description": "Count of treatment-context-only calls (`pi_lsp_rank_context`) in treatment runs."
-    },
-    "notes": {
-      "type": ["string", "null"],
-      "description": "Freeform benchmark notes. Pi runtime artifacts may expose machine-readable usage in extension-owned files such as .pi/suggester/sessions/*/usage.json (session aggregates like inputTokens/outputTokens/costTotal) and .pi/suggester/logs/events.ndjson (turn-level inputTokens/outputTokens/cost), but if those artifacts cannot be confidently mapped to the exact benchmark run, record input_tokens/output_tokens/cost as null and note the missing run-level linkage while still capturing duration/turns/tool_calls/files_read/quality. For blocked or non-executed trace rows, record duration_ms/turns/tool_calls/files_read as null and explain why the run did not occur."
-    }
+    "treatment_direct_adoption_calls": { "type": ["number", "null"] },
+    "treatment_context_calls": { "type": ["number", "null"] },
+    "notes": { "type": ["string", "null"] }
   }
 }

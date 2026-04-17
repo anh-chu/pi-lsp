@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 function classifyTreatmentPiLspUsage(breakdown = {}) {
-  const directAdoptionTools = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references'];
+  const directAdoptionTools = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_plan_navigation'];
   const treatmentContextTools = ['pi_lsp_rank_context'];
   const directAdoptionCalls = directAdoptionTools.reduce((sum, toolName) => sum + (breakdown[toolName] ?? 0), 0);
   const treatmentContextCalls = treatmentContextTools.reduce((sum, toolName) => sum + (breakdown[toolName] ?? 0), 0);
@@ -406,7 +406,7 @@ function scorePrompt(promptId, condition, answerText, breakdown) {
   const usedPiLsp = treatmentUsage.totalPiLspCalls > 0;
   const directPiLspAdoption = treatmentUsage.directAdoptionCalls > 0;
   if (promptId === 'A-01') {
-    const correct = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context']
+    const correct = ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context', 'pi_lsp_plan_navigation']
       .every((toolName) => answer.includes(toolName));
     return {
       quality_score: correct ? 2 : (answer ? 1 : 0),

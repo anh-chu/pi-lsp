@@ -1,19 +1,9 @@
+import { formatCompactSection } from './format.ts';
+import { formatNavigationPlan } from './plan-format.ts';
+import { planNavigation } from './navigation-planner.ts';
 import { rankContext } from './ranking.ts';
 import { findReferences, getSymbolSlice } from './symbols.ts';
-import { formatCompactSection } from './format.ts';
-
-function createPiToolInvoker(pi: any) {
-  if (typeof pi?.invokeTool !== 'function' && typeof pi?.callTool !== 'function' && typeof pi?.runTool !== 'function') {
-    return undefined;
-  }
-
-  return async (toolName: string, params: Record<string, unknown>) => {
-    if (typeof pi?.invokeTool === 'function') return await pi.invokeTool(toolName, params);
-    if (typeof pi?.callTool === 'function') return await pi.callTool(toolName, params);
-    if (typeof pi?.runTool === 'function') return await pi.runTool(toolName, params);
-    return null;
-  };
-}
+import { createPiToolInvoker } from './shared-tool-invoker.ts';
 
 function emitSessionMessage(pi: any, kind: string, content: string, details: Record<string, unknown>) {
   pi.sendMessage({
@@ -58,12 +48,27 @@ export function registerPiLspCommands(pi: any) {
   pi.registerCommand('rank', {
     description: 'Rank relevant files and symbols for current task',
     handler: async (args: string) => {
-      const items = rankContext(args.trim(), 10);
+      const result = rankContext(args.trim(), 10);
       const content = formatCompactSection(
-        'Ranked context',
-        items.map((item) => `- ${item.kind}: ${item.id} (${item.score}) — ${item.reason}`),
+        result.sessionState.hasConcreteEvidence ? 'Ranked context' : 'Fresh-session warning',
+        result.items.length > 0
+          ? result.items.map((item) => `- ${item.kind}: ${item.id} (${item.score}) — ${item.reason}`)
+          : [`- ${result.note}`],
       );
-      emitSessionMessage(pi, 'rank', content, { query: args.trim(), items });
+      emitSessionMessage(pi, 'rank', content, result as unknown as Record<string, unknown>);
+    },
+  });
+
+  pi.registerCommand('nav', {
+    description: 'Plan next navigation hop for compound task',
+    handler: async (args: string, ctx: any) => {
+      const task = args.trim();
+      if (!task) {
+        ctx.ui.notify('Usage: /nav <task>', 'warning');
+        return;
+      }
+      const plan = planNavigation({ task });
+      emitSessionMessage(pi, 'nav', formatNavigationPlan(plan), plan as unknown as Record<string, unknown>);
     },
   });
 }

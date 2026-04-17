@@ -4,7 +4,13 @@ import {
   findAstCandidates,
   findLspCandidates,
 } from './symbol-backends.ts';
-import { rememberMentionedFile, rememberQueriedSymbol, rememberReadFile } from './state.ts';
+import {
+  rememberMentionedFile,
+  rememberQueriedSymbol,
+  rememberReadFile,
+  setLastResolvedDefinition,
+  setLastTopCallerFiles,
+} from './state.ts';
 import { selectBestResult } from './symbol-selection.ts';
 import { resolveReferences } from './symbol-reference-resolution.ts';
 import type { DefinitionQuery, DefinitionResult, ReferenceQuery, ReferenceResult, SymbolQuery, SymbolResult } from './types.ts';
@@ -25,6 +31,14 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
   const location = symbolResult.location;
   const backend = (symbolResult.details.backend as BackendName | undefined) ?? 'fallback';
   const ok = Boolean(location);
+  if (location?.file) {
+    setLastResolvedDefinition({
+      symbol: params.symbol,
+      file: location.file,
+      line: location.line,
+      character: location.character,
+    });
+  }
   const ambiguous = symbolResult.details.ambiguous === true;
   const status: DefinitionResult['details']['status'] = ok ? 'resolved' : (ambiguous ? 'ambiguous' : 'not-found');
   const owningFile = location?.file;
@@ -141,6 +155,13 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
   const ok = hits.length > 0;
   const status: ReferenceResult['details']['status'] = ok ? 'resolved' : 'not-found';
   const bestNextCaller = groupedHits[0];
+  setLastTopCallerFiles(
+    groupedHits.slice(0, 3).map((group) => ({
+      file: group.file,
+      reason: group.impactReason,
+      line: group.topPreview?.line,
+    })),
+  );
   const owningFile = bestNextCaller?.file ?? params.file;
   const nextBestTool = ok ? 'pi_lsp_get_symbol' : 'pi_lsp_find_definition';
   const nextBestArgs = ok
@@ -259,11 +280,31 @@ export async function getSymbolSlice(params: SymbolQuery, options: ResolutionOpt
 
   const lspCandidates = await findLspCandidates(exactQuery, params.file, options.invokeTool);
   const lspResult = selectBestResult(exactQuery, lspCandidates, includeBody, contextLines, options.invokeTool ? 'lsp' : 'fallback', rememberReadFile, params.file);
-  if (lspResult) return lspResult;
+  if (lspResult) {
+    if (lspResult.location?.file) {
+      setLastResolvedDefinition({
+        symbol: exactQuery,
+        file: lspResult.location.file,
+        line: lspResult.location.line,
+        character: lspResult.location.character,
+      });
+    }
+    return lspResult;
+  }
 
   const astCandidates = await findAstCandidates(exactQuery, params.file, options.invokeTool);
   const astResult = selectBestResult(exactQuery, astCandidates, includeBody, contextLines, options.invokeTool ? 'ast' : 'fallback', rememberReadFile, params.file);
-  if (astResult) return astResult;
+  if (astResult) {
+    if (astResult.location?.file) {
+      setLastResolvedDefinition({
+        symbol: exactQuery,
+        file: astResult.location.file,
+        line: astResult.location.line,
+        character: astResult.location.character,
+      });
+    }
+    return astResult;
+  }
 
   return {
     symbol: exactQuery,

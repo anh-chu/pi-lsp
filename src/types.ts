@@ -16,6 +16,12 @@ export interface ReferenceQuery {
   limit?: number;
 }
 
+export type NavigationIntent = 'discover' | 'define' | 'inspect' | 'trace' | 'impact' | 'debug' | 'explain';
+export type NavigationMode = 'auto' | 'inspect' | 'trace' | 'impact' | 'debug' | 'explain';
+export type PlannerStatus = 'needs-discovery' | 'grounded-next-hop' | 'needs-narrowing' | 'answer-now';
+export type PlannerConfidence = 'low' | 'medium' | 'high';
+export type ToolRouteFamily = 'codesight' | 'pi_lsp' | 'lsp_navigation' | 'read' | 'answer';
+
 export interface SymbolLocation {
   file: string;
   line: number;
@@ -156,4 +162,69 @@ export interface RankedItem {
   score: number;
   reason: string;
   file?: string;
+}
+
+export interface PlannerQuery {
+  task: string;
+  symbol?: string;
+  file?: string;
+  mode?: NavigationMode;
+  limit?: number;
+}
+
+export interface ToolRoute {
+  primary: ToolRouteFamily;
+  toolName?: string;
+  args?: Record<string, unknown>;
+  reason: string;
+}
+
+export interface NavigationStep {
+  order: number;
+  toolFamily: ToolRouteFamily;
+  tool: string;
+  args?: Record<string, unknown>;
+  reason: string;
+  stopIfResolved?: boolean;
+}
+
+export interface EvidenceSnapshot {
+  task: string;
+  symbol?: string;
+  file?: string;
+  freshSession: boolean;
+  hasConcreteEvidence: boolean;
+  mentionedFiles: string[];
+  readFiles: string[];
+  queriedSymbols: string[];
+  lastResolvedDefinition?: {
+    symbol: string;
+    file: string;
+    line: number;
+    character?: number;
+  };
+  lastTopCallerFiles: Array<{
+    file: string;
+    reason?: string;
+    line?: number;
+  }>;
+  lastPlannerSummary?: {
+    intent: NavigationIntent;
+    route: ToolRouteFamily;
+    nextTool?: string;
+  };
+}
+
+export interface NavigationPlan {
+  intent: NavigationIntent;
+  status: PlannerStatus;
+  confidence: PlannerConfidence;
+  evidence: EvidenceSnapshot;
+  steps: NavigationStep[];
+  nextTool?: string;
+  nextArgs?: Record<string, unknown>;
+  fallbackSteps: NavigationStep[];
+  stopWhen: string[];
+  bestRoute: ToolRoute;
+  freshSession: boolean;
 }

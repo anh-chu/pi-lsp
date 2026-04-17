@@ -1,31 +1,15 @@
-import { formatCompactSection } from './format.ts';
-import { rankContext } from './ranking.ts';
-import { findDefinition, findReferences, getSymbolSlice } from './symbols.ts';
 import { buildCacheKey, getFileMtimeMs, readFreshCache, setCache } from './cache.ts';
-import type { DefinitionQuery, DefinitionResult, ReferenceQuery, ReferenceResult } from './types.ts';
-
-function createPiToolInvoker(pi: any) {
-  if (typeof pi?.invokeTool !== 'function' && typeof pi?.callTool !== 'function' && typeof pi?.runTool !== 'function') {
-    return undefined;
-  }
-
-  return async (toolName: string, params: Record<string, unknown>) => {
-    if (typeof pi?.invokeTool === 'function') return await pi.invokeTool(toolName, params);
-    if (typeof pi?.callTool === 'function') return await pi.callTool(toolName, params);
-    if (typeof pi?.runTool === 'function') return await pi.runTool(toolName, params);
-    return null;
-  };
-}
+import { formatCompactSection } from './format.ts';
+import { formatNavigationPlan } from './plan-format.ts';
+import { planNavigation } from './navigation-planner.ts';
+import { rankContext } from './ranking.ts';
+import { createPiToolInvoker, textToolResult } from './shared-tool-invoker.ts';
+import { findDefinition, findReferences, getSymbolSlice } from './symbols.ts';
+import type { DefinitionQuery, DefinitionResult, PlannerQuery, ReferenceQuery, ReferenceResult } from './types.ts';
 
 const DEFINITION_CACHE_PREFIX = 'symbol:def';
 const REFERENCES_CACHE_PREFIX = 'symbol:refs';
-
-function textResult(content: string, details: Record<string, unknown> = {}) {
-  return {
-    content: [{ type: 'text', text: content }],
-    details,
-  };
-}
+const NAVIGATION_CACHE_PREFIX = 'nav:plan';
 
 async function buildDefinitionResult(params: DefinitionQuery, pi: any): Promise<DefinitionResult> {
   const cacheKey = buildCacheKey(DEFINITION_CACHE_PREFIX, {
@@ -57,6 +41,15 @@ async function buildReferenceResult(params: ReferenceQuery, pi: any): Promise<Re
   return result;
 }
 
+function buildNavigationPlanResult(params: PlannerQuery) {
+  const cacheKey = buildCacheKey(NAVIGATION_CACHE_PREFIX, params as unknown as Record<string, unknown>);
+  const cached = readFreshCache<ReturnType<typeof planNavigation>>(cacheKey);
+  if (cached) return cached;
+  const result = planNavigation(params);
+  setCache(cacheKey, result);
+  return result;
+}
+
 export function registerPiLspTools(pi: any) {
   pi.registerTool({
     name: 'pi_lsp_get_symbol',
@@ -64,11 +57,11 @@ export function registerPiLspTools(pi: any) {
     description: 'Read one exact grounded symbol definition with minimal code, plus jump-ready next-step hints for follow-up tracing',
     promptSnippet: 'Read one grounded symbol definition with minimal surrounding code',
     promptGuidelines: [
-      'Use this tool after the exact function/class/type name is grounded from current source or repo context.',
-      'Prefer this over plain read once you know the exact symbol name, because it returns a minimal definition slice plus exact location/confidence and jump-ready next-step args.',
-      'If exact symbol name is still uncertain, do not guess variants; use codesight_* or read current source first, then retry with a precise name or file hint.',
-      'If returned definition slice already answers the request, stop and answer immediately instead of taking another hop.',
-      'Use returned nextBestTool/nextBestArgs only when the task explicitly requires deeper tracing beyond this symbol body.',
+      'Use this after exact function, class, type, or method name is grounded from current source, repo context, or earlier navigation work inside same debugging, fix, or feature task.',
+      'Prefer this over plain read once exact symbol is known and current subtask is minimal implementation inspection, because it returns focused definition slice plus exact location metadata and next-step args.',
+      'If exact symbol name is still uncertain, do not guess variants; use codesight_* or read current source first, then retry with precise name or file hint.',
+      'If current file is already open and nearby lines answer subtask faster, plain read is still fine.',
+      'If returned definition slice already answers current subtask, stop and answer immediately instead of taking another hop.'
     ],
     parameters: {
       type: 'object',
@@ -82,21 +75,21 @@ export function registerPiLspTools(pi: any) {
     },
     execute: async (_toolCallId: string, params: { symbol: string; file?: string; includeBody?: boolean; contextLines?: number }) => {
       const result = await getSymbolSlice(params, { invokeTool: createPiToolInvoker(pi) });
-      return textResult(result.content, result.details);
+      return textToolResult(result.content, result.details);
     },
   });
 
   pi.registerTool({
     name: 'pi_lsp_find_definition',
     label: 'Pi LSP Find Definition',
-    description: 'Find the exact definition location for a grounded symbol, with jump-ready next-step guidance for implementation reads',
-    promptSnippet: 'Find where a grounded symbol is defined',
+    description: 'Find exact definition location for grounded symbol, with jump-ready next-step guidance for implementation reads',
+    promptSnippet: 'Find where grounded symbol is defined',
     promptGuidelines: [
-      'Use this after the exact symbol name is known.',
-      'Prefer this over plain read when you only need the owning file/line first; it returns exact location/confidence plus nextBestTool/nextBestArgs for the next jump.',
-      'Prefer codesight_* first for repo-level discovery or when you only know a feature area, route surface, schema area, or package name.',
-      'If returned location already answers the request, answer immediately instead of chaining another pi_lsp_* call.',
-      'Do not follow nextBestTool automatically on simple lookup questions; use one precise pi_lsp_* call first and chain only when deeper tracing is required.',
+      'Use this after exact symbol name is known during navigation work inside larger debug, fix, or implementation flow.',
+      'Prefer this over plain read when current subtask is owning file or line resolution, because it returns exact location plus nextBestTool and nextBestArgs for jump-ready follow-up.',
+      'Prefer codesight_* first for repo-level discovery or when you only know feature area, route surface, schema area, or package name.',
+      'If current file is already grounded and nearby lines reveal definition immediately, plain read is still fine.',
+      'If returned location already answers current subtask, answer immediately instead of chaining another pi_lsp_* call.'
     ],
     parameters: {
       type: 'object',
@@ -108,7 +101,7 @@ export function registerPiLspTools(pi: any) {
     },
     execute: async (_toolCallId: string, params: DefinitionQuery) => {
       const result = await buildDefinitionResult(params, pi);
-      return textResult(result.content, result.details);
+      return textToolResult(result.content, result.details);
     },
   });
 
@@ -116,13 +109,13 @@ export function registerPiLspTools(pi: any) {
     name: 'pi_lsp_find_references',
     label: 'Pi LSP Find References',
     description: 'Find grounded symbol usages with grouped hits, prioritized caller files, and jump-ready next-step hints',
-    promptSnippet: 'Find references or usages of a grounded symbol',
+    promptSnippet: 'Find references or usages of grounded symbol',
     promptGuidelines: [
-      'Use this when tracing impact for an exact grounded symbol at code level.',
-      'Prefer this over grep or broad read once the symbol is exact, because it groups usages, prioritizes likely caller files, and returns nextBestTool/nextBestArgs for the best next hop.',
-      'Do not use this as a first-pass repo exploration tool; prefer codesight_* first when callers or names are still unknown.',
-      'If grouped hits already answer a simple "where used?" question, stop and answer without taking another hop.',
-      'Do not follow nextBestTool automatically on simple lookup questions; start with one precise pi_lsp_* call and chain only when the task explicitly asks for deeper tracing or caller inspection.',
+      'Use this when current navigation subtask is caller tracing, usage tracing, or impact discovery for exact grounded symbol at code level.',
+      'Prefer this over grep or broad read once symbol is exact, because it groups usages, prioritizes likely caller files, and returns nextBestTool and nextBestArgs for best next hop.',
+      'Do not use this as first-pass repo exploration tool; prefer codesight_* first when callers, subsystem, or symbol name are still unknown.',
+      'If one already-open file answers subtask faster, plain read is still fine, but prefer pi_lsp_find_references for cross-file usage tracing.',
+      'If grouped hits already answer current subtask, stop and answer without taking another hop.'
     ],
     parameters: {
       type: 'object',
@@ -135,7 +128,7 @@ export function registerPiLspTools(pi: any) {
     },
     execute: async (_toolCallId: string, params: ReferenceQuery) => {
       const result = await buildReferenceResult(params, pi);
-      return textResult(result.content, result.details);
+      return textToolResult(result.content, result.details);
     },
   });
 
@@ -143,12 +136,12 @@ export function registerPiLspTools(pi: any) {
     name: 'pi_lsp_rank_context',
     label: 'Pi LSP Rank Context',
     description: 'Prioritize files and symbols already observed in this session; never use for first-step repo discovery',
-    promptSnippet: 'Prioritize already-seen session context for the current task',
+    promptSnippet: 'Prioritize already-seen session context for current task',
     promptGuidelines: [
       'Use this only after concrete session evidence exists from this run, such as read files, mentioned files, or grounded symbol lookups.',
-      'Do not use this as a first-step repo exploration tool in a fresh session. It ranks session memory only and cannot discover unseen code.',
+      'Do not use this as first-step repo exploration tool in fresh session. It ranks session memory only and cannot discover unseen code.',
       'If session evidence counts are all zero, inspect source with read or codesight_* first, then rerun ranking only if you need prioritization.',
-      'Treat any fresh-session result as a warning state that should delay ranking until after evidence exists.',
+      'Treat any fresh-session result as warning state that should delay ranking until after evidence exists.',
     ],
     parameters: {
       type: 'object',
@@ -159,7 +152,7 @@ export function registerPiLspTools(pi: any) {
     },
     execute: async (_toolCallId: string, params: { query?: string; limit?: number }) => {
       const result = rankContext(params.query ?? '', params.limit ?? 10);
-      return textResult(
+      return textToolResult(
         formatCompactSection(
           result.sessionState.hasConcreteEvidence ? 'Session context ranking' : 'Fresh-session warning',
           [
@@ -175,11 +168,7 @@ export function registerPiLspTools(pi: any) {
             ...result.guidance.map((line) => `- guidance: ${line}`),
             ...(result.items.length > 0
               ? result.items.map((item) => `- ${item.kind}: ${item.id} (${item.score}) — ${item.reason}`)
-              : [
-                  result.sessionState.hasConcreteEvidence
-                    ? '- ranked items: none yet'
-                    : '- ranked items: withheld until some session evidence exists',
-                ]),
+              : [result.sessionState.hasConcreteEvidence ? '- ranked items: none yet' : '- ranked items: withheld until some session evidence exists']),
           ],
         ),
         {
@@ -192,8 +181,49 @@ export function registerPiLspTools(pi: any) {
           confidence: result.confidence,
           shouldRerunAfterEvidence: result.shouldRerunAfterEvidence,
           freshSession: !result.sessionState.hasConcreteEvidence,
-        }
+        },
       );
+    },
+  });
+
+  pi.registerTool({
+    name: 'pi_lsp_plan_navigation',
+    label: 'Pi LSP Plan Navigation',
+    description: 'Plan next 1-4 navigation hops, choosing among codesight_*, pi_lsp_*, raw lsp_navigation, read, or answer-now',
+    promptSnippet: 'Plan next navigation hop for compound code task',
+    promptGuidelines: [
+      'Use this as front door for compound code navigation inside broad debug, fix, and feature tasks once agent needs to choose next navigation move.',
+      'Planner should reason about current subtask shape, not literal user wording: discovery goes to codesight_* or read, grounded symbol hops go to pi_lsp_*, IDE-style semantic asks go to raw lsp_navigation, and resolved follow-ups may stop with answer-now.',
+      'Never treat pi_lsp_rank_context as fresh-session discovery; planner should route to codesight_* or read first when task is still ungrounded.',
+      'Keep plan bounded. One strong next hop beats long speculative chain.',
+      'If enough evidence already exists in session state for current subtask, planner may return answer-now instead of another tool call.'
+    ],
+    parameters: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'Task to route' },
+        symbol: { type: 'string', description: 'Optional exact symbol if already grounded' },
+        file: { type: 'string', description: 'Optional file hint' },
+        mode: { type: 'string', enum: ['auto', 'inspect', 'trace', 'impact', 'debug', 'explain'] },
+        limit: { type: 'number', minimum: 1, maximum: 4 },
+      },
+      required: ['task'],
+    },
+    execute: async (_toolCallId: string, params: PlannerQuery) => {
+      const plan = buildNavigationPlanResult(params);
+      return textToolResult(formatNavigationPlan(plan), {
+        intent: plan.intent,
+        status: plan.status,
+        confidence: plan.confidence,
+        evidence: plan.evidence,
+        steps: plan.steps,
+        nextTool: plan.nextTool,
+        nextArgs: plan.nextArgs,
+        fallbackSteps: plan.fallbackSteps,
+        stopWhen: plan.stopWhen,
+        bestRoute: plan.bestRoute,
+        freshSession: plan.freshSession,
+      });
     },
   });
 }
