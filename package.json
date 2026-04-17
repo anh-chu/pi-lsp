@@ -40,7 +40,8 @@
   },
   "scripts": {
     "check": "node --experimental-strip-types -e \"import('./src/index.ts').catch((err) => { console.error(err); process.exit(1); })\"",
-    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test": "node --experimental-strip-types --test test/tools.test.ts test/planner.test.ts test/invoker.test.ts test/index.test.ts test/harness.test.ts test/cache.test.ts test/ranking.test.ts",
+    "test:bench": "node --experimental-strip-types --test test/benchmark-reporting.test.ts",
     "bench:harness": "node --experimental-strip-types benchmarks/automation/run-harness-benchmarks.mjs",
     "bench:harness:pilot": "node --experimental-strip-types benchmarks/automation/run-harness-benchmarks.mjs --ids A-01,B-01,E-01",
     "bench:live": "node benchmarks/automation/run-live-benchmarks.mjs",
