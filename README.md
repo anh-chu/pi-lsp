@@ -1,7 +1,20 @@
 # pi-lsp
 Grounded code navigation companion for Pi.
-
 `pi-lsp` is the navigation policy layer. It helps Pi decide the next code-intelligence hop after repo area, file, or symbol is grounded, and it hands off to the right tool family, from repo discovery to exact-symbol navigation to raw IDE-style LSP ops. In practice this means fewer wasted hops on exact symbol and reference tasks, and better first-move decisions on compound debug or feature work.
+
+## Install
+
+```bash
+pi install git:github.com/anh-chu/pi-lsp
+```
+
+Or via npm:
+
+```bash
+npm install pi-lsp
+```
+
+Pi loads the extension through `package.json.pi.extensions`. After install, run `pi update` if new slash commands are not yet visible.
 
 ## Why it exists
 
@@ -27,9 +40,9 @@ Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discove
 
 Recommended stack:
 
-- **`pi-codesight`**, repo discovery. Routes, schema, subsystems, env, hot files.
+- **[`pi-codesight`](https://pi.dev/packages/pi-codesight)**, repo discovery. Routes, schema, subsystems, env, hot files.
 - **`pi-lsp`** (this), grounded navigation and planner.
-- **`pi-lens`**, diagnostics, autofix, hover, signature help, implementation, call hierarchy, rename, advanced cursor-based LSP.
+- **[`pi-lens`](https://pi.dev/packages/pi-lens)**, diagnostics, autofix, hover, signature help, implementation, call hierarchy, rename, advanced cursor-based LSP.
 - **Built-ins**, `read`, `grep`, `find`, `lsp_navigation`, `ast_grep_search`.
 
 Rule of thumb:
@@ -194,13 +207,6 @@ Agent path: `pi_lsp_plan_navigation`. Returns next tool + args or answer-now.
 /rank changes related to tool registration
 ```
 
-## Install
-
-```bash
-npm install pi-lsp
-```
-
-Or install as a Pi package from git. Pi loads the extension through `package.json.pi.extensions`. After manifest changes, run `pi update` or reinstall.
 
 ## User-exposed skills
 
