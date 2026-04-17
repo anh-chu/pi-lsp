@@ -1,17 +1,23 @@
-# pi-lsp
+# pi-code-nav
 Grounded code navigation companion for Pi.
-`pi-lsp` is the navigation policy layer. It helps Pi decide the next code-intelligence hop after repo area, file, or symbol is grounded, and it hands off to the right tool family, from repo discovery to exact-symbol navigation to raw IDE-style LSP ops. In practice this means fewer wasted hops on exact symbol and reference tasks, and better first-move decisions on compound debug or feature work.
+`pi-code-nav` is the navigation policy layer. It helps Pi decide the next code-intelligence hop after repo area, file, or symbol is grounded, and it hands off to the right tool family, from repo discovery to exact-symbol navigation to raw IDE-style LSP ops. In practice this means fewer wasted hops on exact symbol and reference tasks, and better first-move decisions on compound debug or feature work.
 
 ## Install
 
 ```bash
-pi install git:github.com/anh-chu/pi-lsp
+pi install npm:pi-code-nav
 ```
 
-Or via npm:
+Or from git:
 
 ```bash
-npm install pi-lsp
+pi install git:github.com/anh-chu/pi-code-nav
+```
+
+Or via npm directly:
+
+```bash
+npm install pi-code-nav
 ```
 
 Pi loads the extension through `package.json.pi.extensions`. After install, run `pi update` if new slash commands are not yet visible.
@@ -20,7 +26,7 @@ Pi loads the extension through `package.json.pi.extensions`. After install, run 
 
 Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discovery, grounded symbol inspection, usage tracing, semantic IDE ops, and final answer. Different tools win at different phases.
 
-`pi-lsp` keeps that decision sharp so the agent:
+`pi-code-nav` keeps that decision sharp so the agent:
 
 - does not jump to symbol lookups before grounding
 - does not fall back to broad `read` once a symbol is already known
@@ -40,9 +46,9 @@ Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discove
 
 Recommended stack:
 
-- **[`pi-codesight`](https://pi.dev/packages/pi-codesight)**, repo discovery. Routes, schema, subsystems, env, hot files.
-- **`pi-lsp`** (this), grounded navigation and planner.
-- **[`pi-lens`](https://pi.dev/packages/pi-lens)**, diagnostics, autofix, hover, signature help, implementation, call hierarchy, rename, advanced cursor-based LSP.
+- **[`pi-codesight`](https://github.com/anh-chu/pi-codesight)**, repo discovery. Routes, schema, subsystems, env, hot files.
+- **`pi-code-nav`** (this), grounded navigation and planner.
+- **[`pi-lens`](https://www.npmjs.com/package/pi-lens)**, diagnostics, autofix, hover, signature help, implementation, call hierarchy, rename, advanced cursor-based LSP.
 - **Built-ins**, `read`, `grep`, `find`, `lsp_navigation`, `ast_grep_search`.
 
 Rule of thumb:
@@ -210,7 +216,7 @@ Agent path: `pi_lsp_plan_navigation`. Returns next tool + args or answer-now.
 
 ## User-exposed skills
 
-No separate skill bundle ships with `pi-lsp` yet. Planner guidance is already embedded in the tool descriptions and surfaced through `/nav`.
+No separate skill bundle ships with `pi-code-nav` yet. Planner guidance is already embedded in the tool descriptions and surfaced through `/nav`.
 
 Recommended companion skills from the Pi ecosystem:
 
@@ -221,7 +227,7 @@ Recommended companion skills from the Pi ecosystem:
 
 ## Configuration
 
-`pi-lsp` reads no external configuration. Internal caching is mtime-scoped per file.
+`pi-code-nav` reads no external configuration. Internal caching is mtime-scoped per file.
 
 ## Docs
 

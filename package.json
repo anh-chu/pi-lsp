@@ -1,17 +1,17 @@
 {
-  "name": "pi-lsp",
-  "version": "0.2.0",
+  "name": "pi-code-nav",
+  "version": "0.2.1",
   "description": "Exact symbol navigation companion for Pi, built to sit between pi-codesight discovery and pi-lens raw LSP operations.",
   "type": "module",
   "main": "src/index.ts",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anh-chu/pi-lsp.git"
+    "url": "https://github.com/anh-chu/pi-code-nav.git"
   },
-  "homepage": "https://github.com/anh-chu/pi-lsp#readme",
+  "homepage": "https://github.com/anh-chu/pi-code-nav#readme",
   "bugs": {
-    "url": "https://github.com/anh-chu/pi-lsp/issues"
+    "url": "https://github.com/anh-chu/pi-code-nav/issues"
   },
   "keywords": [
     "pi-package",
