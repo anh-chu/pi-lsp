@@ -1,6 +1,6 @@
 {
   "name": "pi-code-nav",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Exact symbol navigation companion for Pi, built to sit between pi-codesight discovery and pi-lens raw LSP operations.",
   "type": "module",
   "main": "src/index.ts",

@@ -17,7 +17,7 @@ test('registers expected pi-lsp tools', () => {
   registerPiLspTools(pi);
   assert.deepEqual(
     pi.tools.map((tool) => tool.name),
-    ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context', 'pi_lsp_plan_navigation'],
+    ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context', 'pi_lsp_plan_navigation', 'ast_grep_search', 'ast_grep_replace'],
   );
 });
 

@@ -40,16 +40,15 @@ Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discove
 - **Session-aware reuse**, resolved definitions, top caller files, and queried symbols persist inside the session.
 - **Answer-now short-circuit**, planner can return a direct answer when evidence already suffices.
 - **Tight steering**, tool descriptions and intent classifier target agent subtask shape, not literal user wording.
-- **Complements, not replaces**, works alongside `pi-codesight` for discovery and `pi-lens` for diagnostics.
+- **Complements, not replaces**, works alongside `pi-codesight` for discovery and the built-in `ast_grep_search` / `ast_grep_replace` for structural edits.
 
 ## Ecosystem
 
 Recommended stack:
 
 - **[`pi-codesight`](https://github.com/anh-chu/pi-codesight)**, repo discovery. Routes, schema, subsystems, env, hot files.
-- **`pi-code-nav`** (this), grounded navigation and planner.
-- **[`pi-lens`](https://www.npmjs.com/package/pi-lens)**, diagnostics, autofix, hover, signature help, implementation, call hierarchy, rename, advanced cursor-based LSP.
-- **Built-ins**, `read`, `grep`, `find`, `lsp_navigation`, `ast_grep_search`.
+- **`pi-code-nav`** (this), grounded navigation, planner, and structural AST search/replace.
+- **Built-ins**, `read`, `grep`, `find`, `lsp_navigation`.
 
 Rule of thumb:
 
