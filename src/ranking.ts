@@ -69,7 +69,7 @@ export function rankContext(query = '', limit = 10): RankContextResult {
       note: 'Fresh-session warning only. No files have been mentioned or read and no symbols have been queried in this run yet. Ranked items are intentionally withheld, and the query itself is not echoed back as a ranked candidate until some session evidence exists.',
       guidance: [
         'Do not treat this output as repo search or discovery.',
-        'Inspect source first with read or codesight_* before using pi_lsp_rank_context.',
+        'Inspect source first with read or codesight_* before using code_nav_rank_context.',
         'After reading a file, grounding a symbol, or mentioning a concrete file path, rerun ranking if prioritization is still useful.',
       ],
       status: 'fresh-session',

@@ -54,10 +54,10 @@ Main issues:
 - [x] Cache is simple and invalidated safely
 
 ## Tooling / API design
-- [x] `pi_lsp_get_symbol` implemented and useful
-- [x] `pi_lsp_find_definition` implemented or explicitly deferred
-- [x] `pi_lsp_find_references` implemented or explicitly deferred
-- [x] `pi_lsp_rank_context` implemented or explicitly deferred
+- [x] `code_nav_get_symbol` implemented and useful
+- [x] `code_nav_find_definition` implemented or explicitly deferred
+- [x] `code_nav_find_references` implemented or explicitly deferred
+- [x] `code_nav_rank_context` implemented or explicitly deferred
 - [~] Tool schemas match plan or documented deviation exists
 - [x] `promptSnippet` present where needed
 - [x] `promptGuidelines` present where needed

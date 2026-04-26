@@ -54,16 +54,16 @@ function buildNavigationPlanResult(params: PlannerQuery) {
 
 export function registerPiLspTools(pi: any) {
   pi.registerTool({
-    name: 'pi_lsp_get_symbol',
+    name: 'code_nav_get_symbol',
     label: 'Pi LSP Get Symbol',
     description: 'Read one exact grounded symbol definition with minimal code, plus jump-ready next-step hints for follow-up tracing',
     promptSnippet: 'Read one grounded symbol definition with minimal surrounding code',
     promptGuidelines: [
-      'Use pi_lsp_get_symbol after exact function, class, type, or method name is grounded from current source, repo context, or earlier navigation work inside same debugging, fix, or feature task.',
-      'Prefer pi_lsp_get_symbol over plain read once exact symbol is known and current subtask is minimal implementation inspection, because it returns focused definition slice plus exact location metadata and next-step args.',
-      'If exact symbol name is still uncertain, do not guess variants; use codesight_* or read current source first, then retry pi_lsp_get_symbol with precise name or file hint.',
-      'If current file is already open and nearby lines answer subtask faster, plain read is still fine instead of pi_lsp_get_symbol.',
-      'If pi_lsp_get_symbol already returned the definition slice, stop and answer immediately instead of taking another hop.'
+      'Use code_nav_get_symbol after exact function, class, type, or method name is grounded from current source, repo context, or earlier navigation work inside same debugging, fix, or feature task.',
+      'Prefer code_nav_get_symbol over plain read once exact symbol is known and current subtask is minimal implementation inspection, because it returns focused definition slice plus exact location metadata and next-step args.',
+      'If exact symbol name is still uncertain, do not guess variants; use codesight_* or read current source first, then retry code_nav_get_symbol with precise name or file hint.',
+      'If current file is already open and nearby lines answer subtask faster, plain read is still fine instead of code_nav_get_symbol.',
+      'If code_nav_get_symbol already returned the definition slice, stop and answer immediately instead of taking another hop.'
     ],
     parameters: {
       type: 'object',
@@ -82,16 +82,16 @@ export function registerPiLspTools(pi: any) {
   });
 
   pi.registerTool({
-    name: 'pi_lsp_find_definition',
+    name: 'code_nav_find_definition',
     label: 'Pi LSP Find Definition',
     description: 'Find exact definition location for grounded symbol, with jump-ready next-step guidance for implementation reads',
     promptSnippet: 'Find where grounded symbol is defined',
     promptGuidelines: [
-      'Use pi_lsp_find_definition after exact symbol name is known during navigation work inside larger debug, fix, or implementation flow.',
-      'Prefer pi_lsp_find_definition over plain read when current subtask is owning file or line resolution, because it returns exact location plus nextBestTool and nextBestArgs for jump-ready follow-up.',
-      'Prefer codesight_* first for repo-level discovery or when you only know feature area, route surface, schema area, or package name; use pi_lsp_find_definition once symbol name is exact.',
-      'If current file is already grounded and nearby lines reveal definition immediately, plain read is still fine instead of pi_lsp_find_definition.',
-      'If pi_lsp_find_definition already returned the location, answer immediately instead of chaining another pi_lsp_* call.'
+      'Use code_nav_find_definition after exact symbol name is known during navigation work inside larger debug, fix, or implementation flow.',
+      'Prefer code_nav_find_definition over plain read when current subtask is owning file or line resolution, because it returns exact location plus nextBestTool and nextBestArgs for jump-ready follow-up.',
+      'Prefer codesight_* first for repo-level discovery or when you only know feature area, route surface, schema area, or package name; use code_nav_find_definition once symbol name is exact.',
+      'If current file is already grounded and nearby lines reveal definition immediately, plain read is still fine instead of code_nav_find_definition.',
+      'If code_nav_find_definition already returned the location, answer immediately instead of chaining another code_nav_* call.'
     ],
     parameters: {
       type: 'object',
@@ -108,16 +108,16 @@ export function registerPiLspTools(pi: any) {
   });
 
   pi.registerTool({
-    name: 'pi_lsp_find_references',
+    name: 'code_nav_find_references',
     label: 'Pi LSP Find References',
     description: 'Find grounded symbol usages with grouped hits, prioritized caller files, and jump-ready next-step hints',
     promptSnippet: 'Find references or usages of grounded symbol',
     promptGuidelines: [
-      'Use pi_lsp_find_references when current navigation subtask is caller tracing, usage tracing, or impact discovery for exact grounded symbol at code level.',
-      'Prefer pi_lsp_find_references over grep or broad read once symbol is exact, because it groups usages, prioritizes likely caller files, and returns nextBestTool and nextBestArgs for best next hop.',
-      'Do not use pi_lsp_find_references as first-pass repo exploration tool; prefer codesight_* first when callers, subsystem, or symbol name are still unknown.',
-      'If one already-open file answers subtask faster, plain read is still fine; use pi_lsp_find_references for cross-file usage tracing.',
-      'If pi_lsp_find_references grouped hits already answer current subtask, stop and answer without taking another hop.'
+      'Use code_nav_find_references when current navigation subtask is caller tracing, usage tracing, or impact discovery for exact grounded symbol at code level.',
+      'Prefer code_nav_find_references over grep or broad read once symbol is exact, because it groups usages, prioritizes likely caller files, and returns nextBestTool and nextBestArgs for best next hop.',
+      'Do not use code_nav_find_references as first-pass repo exploration tool; prefer codesight_* first when callers, subsystem, or symbol name are still unknown.',
+      'If one already-open file answers subtask faster, plain read is still fine; use code_nav_find_references for cross-file usage tracing.',
+      'If code_nav_find_references grouped hits already answer current subtask, stop and answer without taking another hop.'
     ],
     parameters: {
       type: 'object',
@@ -135,15 +135,15 @@ export function registerPiLspTools(pi: any) {
   });
 
   pi.registerTool({
-    name: 'pi_lsp_rank_context',
+    name: 'code_nav_rank_context',
     label: 'Pi LSP Rank Context',
     description: 'Prioritize files and symbols already observed in this session; never use for first-step repo discovery',
     promptSnippet: 'Prioritize already-seen session context for current task',
     promptGuidelines: [
-      'Use pi_lsp_rank_context only after concrete session evidence exists from this run, such as read files, mentioned files, or grounded symbol lookups.',
-      'Do not use pi_lsp_rank_context as first-step repo exploration in a fresh session — it ranks session memory only and cannot discover unseen code.',
-      'If session evidence counts are all zero, inspect source with read or codesight_* first, then call pi_lsp_rank_context only if prioritization is needed.',
-      'Treat any pi_lsp_rank_context fresh-session result as a warning state — delay ranking until after evidence exists.',
+      'Use code_nav_rank_context only after concrete session evidence exists from this run, such as read files, mentioned files, or grounded symbol lookups.',
+      'Do not use code_nav_rank_context as first-step repo exploration in a fresh session — it ranks session memory only and cannot discover unseen code.',
+      'If session evidence counts are all zero, inspect source with read or codesight_* first, then call code_nav_rank_context only if prioritization is needed.',
+      'Treat any code_nav_rank_context fresh-session result as a warning state — delay ranking until after evidence exists.',
     ],
     parameters: {
       type: 'object',
@@ -189,16 +189,16 @@ export function registerPiLspTools(pi: any) {
   });
 
   pi.registerTool({
-    name: 'pi_lsp_plan_navigation',
-    label: 'Pi LSP Plan Navigation',
-    description: 'Plan next 1-4 navigation hops, choosing among codesight_*, pi_lsp_*, raw lsp_navigation, read, or answer-now',
+    name: 'code_nav_plan_navigation',
+    label: 'Code Nav Plan Navigation',
+    description: 'Plan next 1-4 navigation hops, choosing among codesight_*, code_nav_*, raw lsp_navigation, read, or answer-now',
     promptSnippet: 'Plan next navigation hop for compound code task',
     promptGuidelines: [
-      'Use pi_lsp_plan_navigation as front door for compound code navigation inside broad debug, fix, and feature tasks once agent needs to choose next navigation move.',
-      'pi_lsp_plan_navigation reasons about current subtask shape, not literal user wording: discovery goes to codesight_* or read, grounded symbol hops go to pi_lsp_*, IDE-style semantic asks go to raw lsp_navigation, and resolved follow-ups may stop with answer-now.',
-      'Never use pi_lsp_plan_navigation as a substitute for pi_lsp_rank_context fresh-session discovery; route to codesight_* or read first when task is still ungrounded.',
-      'Keep pi_lsp_plan_navigation plan bounded — one strong next hop beats a long speculative chain.',
-      'If enough evidence already exists in session state, pi_lsp_plan_navigation may return answer-now instead of another tool call.'
+      'Use code_nav_plan_navigation as front door for compound code navigation inside broad debug, fix, and feature tasks once agent needs to choose next navigation move.',
+      'code_nav_plan_navigation reasons about current subtask shape, not literal user wording: discovery goes to codesight_* or read, grounded symbol hops go to code_nav_*, IDE-style semantic asks go to raw lsp_navigation, and resolved follow-ups may stop with answer-now.',
+      'Never use code_nav_plan_navigation as a substitute for code_nav_rank_context fresh-session discovery; route to codesight_* or read first when task is still ungrounded.',
+      'Keep code_nav_plan_navigation plan bounded — one strong next hop beats a long speculative chain.',
+      'If enough evidence already exists in session state, code_nav_plan_navigation may return answer-now instead of another tool call.'
     ],
     parameters: {
       type: 'object',

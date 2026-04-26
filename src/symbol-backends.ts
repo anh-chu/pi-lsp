@@ -63,10 +63,60 @@ interface ReferenceCandidate extends ReferenceHit {
   hinted: boolean;
 }
 
-export function astGrepSearchParams(pattern: string, scope: string): Record<string, unknown> {
+/** Extension to ast-grep language mapping */
+const extToAstGrepLang: Record<string, string> = {
+  '.ts': 'typescript',
+  '.tsx': 'tsx',
+  '.mts': 'typescript',
+  '.cts': 'typescript',
+  '.js': 'javascript',
+  '.jsx': 'javascript',
+  '.mjs': 'javascript',
+  '.cjs': 'javascript',
+  '.css': 'css',
+  '.scss': 'css',
+  '.sass': 'css',
+  '.py': 'python',
+  '.go': 'go',
+  '.rb': 'ruby',
+  '.java': 'java',
+  '.rs': 'rust',
+  '.cs': 'csharp',
+  '.php': 'php',
+  '.kt': 'kotlin',
+  '.kts': 'kotlin',
+  '.swift': 'swift',
+  '.dart': 'dart',
+  '.ex': 'elixir',
+  '.exs': 'elixir',
+  '.hs': 'haskell',
+  '.lua': 'lua',
+  '.scala': 'scala',
+  '.html': 'html',
+  '.htm': 'html',
+  '.json': 'json',
+  '.yaml': 'yaml',
+  '.yml': 'yaml',
+  '.sql': 'sql',
+  '.c': 'c',
+  '.cpp': 'cpp',
+};
+
+/**
+ * Detect language from file path extension.
+ * @param filePath - The file path to detect language from
+ * @returns The ast-grep language string, defaults to 'typescript'
+ */
+export function detectLangFromPath(filePath: string): string {
+  const ext = filePath.substring(filePath.lastIndexOf('.')).toLowerCase();
+  return extToAstGrepLang[ext] ?? 'typescript';
+}
+
+export function astGrepSearchParams(pattern: string, scope: string, lang?: string): Record<string, unknown> {
+  const detectedLang = lang ?? detectLangFromPath(scope);
   return {
     pattern,
-    lang: 'typescript',
+    lang: detectedLang,
     paths: [scope],
   };
 }

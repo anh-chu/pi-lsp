@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import type { ReferenceHit, SymbolCandidate } from './types.ts';
 import type { MatchKind } from './symbol-backends.ts';
+import { detectLangFromPath } from './symbol-backends.ts';
 import {
   classifyDeclaration,
   classifyMatchKind,
@@ -17,6 +18,7 @@ interface ReferenceCandidate extends ReferenceHit {
 }
 
 const SOURCE_EXTENSIONS = new Set([
+  // JavaScript/TypeScript
   '.ts',
   '.tsx',
   '.js',
@@ -25,6 +27,44 @@ const SOURCE_EXTENSIONS = new Set([
   '.cjs',
   '.mts',
   '.cts',
+  // CSS/Sass
+  '.css',
+  '.scss',
+  '.sass',
+  '.less',
+  // Python
+  '.py',
+  // Go
+  '.go',
+  // Ruby
+  '.rb',
+  // Java
+  '.java',
+  // Rust
+  '.rs',
+  // C#
+  '.cs',
+  // PHP
+  '.php',
+  // Kotlin
+  '.kt',
+  '.kts',
+  // Swift
+  '.swift',
+  // Dart
+  '.dart',
+  // Elixir
+  '.ex',
+  '.exs',
+  // Haskell
+  '.hs',
+  // Lua
+  '.lua',
+  // Scala
+  '.scala',
+  // HTML
+  '.html',
+  '.htm',
 ]);
 
 const IGNORE_DIRS = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.next']);
@@ -120,11 +160,12 @@ function scanFileForSymbol(file: string, symbol: string, fileHint?: string): Sym
     return [];
   }
 
+  const lang = detectLangFromPath(file);
   const lines = text.split(/\r?\n/);
   const candidates: SymbolCandidate[] = [];
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]!;
-    const declaration = classifyDeclaration(line, symbol);
+    const declaration = classifyDeclaration(line, symbol, lang);
     if (!declaration) continue;
     const matchKind = classifyMatchKind(line, symbol);
     const range = findBlockRange(lines, index + 1);

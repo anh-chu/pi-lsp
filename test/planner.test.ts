@@ -11,15 +11,15 @@ test.beforeEach(() => {
 
 test('planner routes grounded inspect task to symbol tool', () => {
   const plan = planNavigation({ task: 'Show implementation body for hello', symbol: 'hello', file: 'src/demo.ts' });
-  assert.equal(plan.bestRoute.primary, 'pi_lsp');
-  assert.equal(plan.nextTool, 'pi_lsp_get_symbol');
+  assert.equal(plan.bestRoute.primary, 'code_nav');
+  assert.equal(plan.nextTool, 'code_nav_get_symbol');
   assert.deepEqual(plan.nextArgs, { symbol: 'hello', file: 'src/demo.ts', includeBody: true });
 });
 
 test('planner routes impact task to references tool', () => {
   const plan = planNavigation({ task: 'Where is hello used?', symbol: 'hello', file: 'src/demo.ts' });
-  assert.equal(plan.bestRoute.primary, 'pi_lsp');
-  assert.equal(plan.nextTool, 'pi_lsp_find_references');
+  assert.equal(plan.bestRoute.primary, 'code_nav');
+  assert.equal(plan.nextTool, 'code_nav_find_references');
 });
 
 test('planner sends fresh session to discovery first', () => {
@@ -48,29 +48,29 @@ test('planner returns answer-now when caller evidence already exists', () => {
 test('planner tool registered and returns machine-readable plan', async () => {
   const pi = fakePi();
   registerPiLspTools(pi);
-  const tool = findTool(pi, 'pi_lsp_plan_navigation');
+  const tool = findTool(pi, 'code_nav_plan_navigation');
   const result = await tool.execute('call-1', { task: 'Show implementation body for hello', symbol: 'hello', file: 'src/demo.ts' });
   assert.match(result.content[0].text, /Navigation plan/);
-  assert.equal(result.details.nextTool, 'pi_lsp_get_symbol');
-  assert.equal(result.details.bestRoute.primary, 'pi_lsp');
+  assert.equal(result.details.nextTool, 'code_nav_get_symbol');
+  assert.equal(result.details.bestRoute.primary, 'code_nav');
 });
 
 test('planner routes "what should I inspect next" to discovery, not inspect', () => {
   const plan = planNavigation({ task: 'What should I inspect next for this bug?' });
   assert.equal(plan.intent, 'discover');
-  assert.notEqual(plan.bestRoute.primary, 'pi_lsp');
+  assert.notEqual(plan.bestRoute.primary, 'code_nav');
 });
 
 test('planner recognizes "declared" as define intent', () => {
   const plan = planNavigation({ task: 'Where is hello declared?', symbol: 'hello', file: 'src/demo.ts' });
   assert.equal(plan.intent, 'define');
-  assert.equal(plan.nextTool, 'pi_lsp_find_definition');
+  assert.equal(plan.nextTool, 'code_nav_find_definition');
 });
 
 test('planner recognizes "location of" as define intent', () => {
   const plan = planNavigation({ task: 'Give me the location of hello', symbol: 'hello', file: 'src/demo.ts' });
   assert.equal(plan.intent, 'define');
-  assert.equal(plan.nextTool, 'pi_lsp_find_definition');
+  assert.equal(plan.nextTool, 'code_nav_find_definition');
 });
 
 test('planner treats "inspect" word without code noun as non-inspect', () => {

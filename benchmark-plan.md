@@ -273,7 +273,7 @@ Key metrics:
 - total tool calls across full prompt
 - ordered evidence quality
 - unnecessary broad-read penalty
-- whether treatment uses `pi_lsp_*` after narrowing, not before
+- whether treatment uses `code_nav_*` after narrowing, not before
 
 ## Suite E — control tasks
 Purpose:
@@ -535,7 +535,7 @@ This is expected.
 Must explicitly look for bad outcomes.
 
 ### Regression 1 — tool distraction
-Treatment may overuse `pi_lsp_*` on simple tasks.
+Treatment may overuse `code_nav_*` on simple tasks.
 
 Detect by:
 - higher tool calls on control tasks
@@ -676,7 +676,7 @@ Rationale:
 - Quality preservation is unproven because there are no live answers to score.
 - Core metrics required by the decision rule remain missing (`duration_ms`, `turns`, `tool_calls`, `files_read`).
 - Token/cost extraction is technically available when an exact `session_path` can be linked to a live Pi session, and live CLI runs now confirm that path can be captured from `.pi/suggester/sessions/*/meta.json`; however, that linkage is still absent for the blocked stub rows.
-- Treatment startup/runtime now visibly exposes the four expected `pi-lsp` tools (`pi_lsp_get_symbol`, `pi_lsp_find_definition`, `pi_lsp_find_references`, `pi_lsp_rank_context`), reducing concern about extension-loading mismatch on the tool surface.
+- Treatment startup/runtime now visibly exposes the four expected `pi-lsp` tools (`code_nav_get_symbol`, `code_nav_find_definition`, `code_nav_find_references`, `code_nav_rank_context`), reducing concern about extension-loading mismatch on the tool surface.
 - The three slash commands (`/symbol`, `/refs`, `/rank`) are still source-confirmed only in this environment because no runtime command-registry listing was exposed.
 - `E-01` cannot rule out regressions yet, so the control guardrail is still untested.
 
@@ -717,7 +717,7 @@ Do this next:
    - `C-01`
    - `E-01`
    using fresh comparable sessions or the documented reset checklist above before each baseline/treatment pair
-   - in treatment notes, explicitly record the live surface-check finding: four `pi_lsp_*` tools were runtime-visible in a real Pi treatment session; `/symbol`, `/refs`, and `/rank` remain expected-but-not-registry-listed in this CLI environment
+   - in treatment notes, explicitly record the live surface-check finding: four `code_nav_*` tools were runtime-visible in a real Pi treatment session; `/symbol`, `/refs`, and `/rank` remain expected-but-not-registry-listed in this CLI environment
 4. Save rows using `benchmarks/results/results-template.jsonl` shape, including the exact `session_path` and session-control notes for audit
 5. Backfill token/cost data with `node benchmarks/results/extract-pi-usage-from-row.mjs <results.jsonl> <run_id>` when the row has a verified `session_path`
 6. Leave token/cost fields as `null` only when the parser cannot attribute the run unambiguously

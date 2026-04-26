@@ -17,7 +17,7 @@ test('registers expected pi-lsp tools', () => {
   registerPiLspTools(pi);
   assert.deepEqual(
     pi.tools.map((tool) => tool.name),
-    ['pi_lsp_get_symbol', 'pi_lsp_find_definition', 'pi_lsp_find_references', 'pi_lsp_rank_context', 'pi_lsp_plan_navigation', 'ast_grep_search', 'ast_grep_replace'],
+    ['code_nav_get_symbol', 'code_nav_find_definition', 'code_nav_find_references', 'code_nav_rank_context', 'code_nav_plan_navigation', 'ast_grep_search', 'ast_grep_replace'],
   );
 });
 
@@ -100,7 +100,7 @@ test('findDefinition exposes concise jump metadata once owning file is grounded'
     const result = await findDefinition({ symbol: 'hello', file: 'src/demo.ts' });
 
     assert.equal(result.details.owningFile?.endsWith('src/demo.ts'), true);
-    assert.equal(result.details.nextBestTool, 'pi_lsp_get_symbol');
+    assert.equal(result.details.nextBestTool, 'code_nav_get_symbol');
     assert.deepEqual(result.details.nextBestArgs, {
       symbol: 'hello',
       file: result.location?.file,
@@ -119,7 +119,7 @@ test('findDefinition tool replaces placeholder text with shared navigation resul
   }, async () => {
     const pi = fakePi();
     registerPiLspTools(pi);
-    const tool = findTool(pi, 'pi_lsp_find_definition');
+    const tool = findTool(pi, 'code_nav_find_definition');
     const response = await tool.execute('call-1', { symbol: 'hello', file: 'src/demo.ts' });
 
     assert.equal(response.details.ok, true);
@@ -164,7 +164,7 @@ test('findReferences exposes concise jump metadata for the best next caller file
 
     assert.equal(result.details.owningFile?.endsWith(result.details.bestNextCallerFile ?? ''), true);
     assert.equal(typeof result.details.bestNextCallerFile, 'string');
-    assert.equal(result.details.nextBestTool, 'pi_lsp_get_symbol');
+    assert.equal(result.details.nextBestTool, 'code_nav_get_symbol');
     assert.deepEqual(result.details.nextBestArgs, {
       symbol: 'hello',
       file: result.details.owningFile,
@@ -186,7 +186,7 @@ test('findReferences tool replaces placeholder text with shared navigation resul
   }, async () => {
     const pi = fakePi();
     registerPiLspTools(pi);
-    const tool = findTool(pi, 'pi_lsp_find_references');
+    const tool = findTool(pi, 'code_nav_find_references');
     const response = await tool.execute('call-2', { symbol: 'hello', file: 'src/demo.ts', limit: 10 });
 
     assert.equal(response.details.ok, true);
@@ -339,7 +339,7 @@ test('rank context tool makes fresh-session warning explicit in text and details
   resetState();
   const pi = fakePi();
   registerPiLspTools(pi);
-  const tool = findTool(pi, 'pi_lsp_rank_context');
+  const tool = findTool(pi, 'code_nav_rank_context');
 
   const response = await tool.execute('call-rank-1', { query: 'routes bug', limit: 10 });
 
@@ -360,8 +360,8 @@ test('rank context tool emphasizes session-only scope when evidence exists', asy
   await withTempProject({ 'src/demo.ts': 'export function hello() {\n  return 1;\n}\n' }, async () => {
     const pi = fakePi();
     registerPiLspTools(pi);
-    const symbolTool = findTool(pi, 'pi_lsp_get_symbol');
-    const rankTool = findTool(pi, 'pi_lsp_rank_context');
+    const symbolTool = findTool(pi, 'code_nav_get_symbol');
+    const rankTool = findTool(pi, 'code_nav_rank_context');
 
     await symbolTool.execute('call-symbol-1', { symbol: 'hello', file: 'src/demo.ts' });
     const response = await rankTool.execute('call-rank-2', { query: 'hello bug', limit: 10 });

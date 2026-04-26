@@ -42,7 +42,7 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
   const ambiguous = symbolResult.details.ambiguous === true;
   const status: DefinitionResult['details']['status'] = ok ? 'resolved' : (ambiguous ? 'ambiguous' : 'not-found');
   const owningFile = location?.file;
-  const nextBestTool = ok ? 'pi_lsp_get_symbol' : (ambiguous ? 'pi_lsp_get_symbol' : 'codesight_*');
+  const nextBestTool = ok ? 'code_nav_get_symbol' : (ambiguous ? 'code_nav_get_symbol' : 'codesight_*');
   const nextBestArgs = ok
     ? { symbol: params.symbol, file: owningFile, includeBody: true }
     : (ambiguous ? { symbol: params.symbol, file: params.file } : { query: params.symbol });
@@ -53,17 +53,17 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
         : 'Exact symbol or owning file is still ungrounded.');
   const suggestedNextSteps = ok
     ? [
-        'Call pi_lsp_get_symbol with the resolved file to read the definition body with minimal surrounding code.',
-        'Then call pi_lsp_find_references if you need impact or caller tracing.',
+        'Call code_nav_get_symbol with the resolved file to read the definition body with minimal surrounding code.',
+        'Then call code_nav_find_references if you need impact or caller tracing.',
       ]
     : (ambiguous
         ? [
-            'Pass a narrower file hint to pi_lsp_get_symbol to choose the intended candidate.',
+            'Pass a narrower file hint to code_nav_get_symbol to choose the intended candidate.',
             'If the owning file is still unknown, use codesight_* for repo-level discovery first.',
           ]
         : [
             'Use codesight_* or current source to confirm the exact symbol name or file.',
-            'Retry pi_lsp_find_definition only after the name is grounded exactly.',
+            'Retry code_nav_find_definition only after the name is grounded exactly.',
           ]);
 
   return {
@@ -82,9 +82,9 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
       ok && nextBestArgs ? `- next args: ${JSON.stringify(nextBestArgs)}` : '- next args: none',
       ok && nextBestReason ? `- next reason: ${nextBestReason}` : '- next reason: n/a',
       ok
-        ? '- next: answer immediately if the resolved definition already satisfies the request; only call another pi_lsp_* tool when deeper tracing is explicitly needed'
+        ? '- next: answer immediately if the resolved definition already satisfies the request; only call another code_nav_* tool when deeper tracing is explicitly needed'
         : (ambiguous
-            ? '- next: pass a narrower file hint to pi_lsp_get_symbol or use codesight_* to disambiguate'
+            ? '- next: pass a narrower file hint to code_nav_get_symbol or use codesight_* to disambiguate'
             : '- next: use codesight_* or current source to ground the exact symbol name before retrying'),
     ]),
     details: {
@@ -140,7 +140,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
         suggestedNextArgs: { query: params.symbol },
         suggestedNextSteps: [
           'Confirm the exact symbol name from current source or repo context.',
-          'Retry pi_lsp_find_references with one grounded symbol name.',
+          'Retry code_nav_find_references with one grounded symbol name.',
         ],
       },
     };
@@ -163,7 +163,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
     })),
   );
   const owningFile = bestNextCaller?.file ?? params.file;
-  const nextBestTool = ok ? 'pi_lsp_get_symbol' : 'pi_lsp_find_definition';
+  const nextBestTool = ok ? 'code_nav_get_symbol' : 'code_nav_find_definition';
   const nextBestArgs = ok
     ? { symbol, file: owningFile, includeBody: false }
     : { symbol, file: params.file };
@@ -194,7 +194,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
         'Use the remaining impact files as secondary follow-up sites only if the first caller is not enough.',
       ]
     : [
-        'Call pi_lsp_find_definition first to verify the exact symbol and owning file.',
+        'Call code_nav_find_definition first to verify the exact symbol and owning file.',
         'If names are still uncertain, use codesight_* for repo-level discovery before retrying references.',
       ];
 
@@ -222,7 +222,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       ...formatReferenceGroups(groupedHits),
       ok
         ? '- next: answer immediately if grouped hits already satisfy the request; inspect the best next caller only when deeper tracing is explicitly needed'
-        : '- next: call pi_lsp_find_definition first, or use codesight_* if the symbol/path is still not grounded',
+        : '- next: call code_nav_find_definition first, or use codesight_* if the symbol/path is still not grounded',
     ]),
     details: {
       symbol,
@@ -314,7 +314,7 @@ export async function getSymbolSlice(params: SymbolQuery, options: ResolutionOpt
       '- result: no exact definition candidate found',
       '- likely cause: guessed or approximate symbol name did not match current source exactly',
       '- next: verify exact exported symbol name from current source before retrying; do not keep guessing variants of the name',
-      '- hint: use codesight_* for fresh repo/path discovery, and reserve pi_lsp_* for exact symbol or caller follow-up once names are grounded',
+      '- hint: use codesight_* for fresh repo/path discovery, and reserve code_nav_* for exact symbol or caller follow-up once names are grounded',
     ]),
     details: {
       symbol: exactQuery,
@@ -326,7 +326,7 @@ export async function getSymbolSlice(params: SymbolQuery, options: ResolutionOpt
       suggestedNextSteps: [
         'Verify the exact symbol name from current source before retrying; do not keep guessing variants.',
         'Use codesight_* first for repo-level discovery when the symbol/path is not yet grounded.',
-        'Retry pi_lsp_get_symbol with an exact symbol name or a narrower file hint.',
+        'Retry code_nav_get_symbol with an exact symbol name or a narrower file hint.',
       ],
     },
   };

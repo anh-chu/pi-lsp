@@ -36,7 +36,7 @@ Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discove
 ## Value props
 
 - **Grounded symbol navigation**, minimal slices, definition location, grouped references.
-- **Navigation planner**, bounded 1-4 hop plan across `codesight_*`, `pi_lsp_*`, `lsp_navigation`, `read`, and answer-now.
+- **Navigation planner**, bounded 1-4 hop plan across `codesight_*`, `code_nav_*`, `lsp_navigation`, `read`, and answer-now.
 - **Session-aware reuse**, resolved definitions, top caller files, and queried symbols persist inside the session.
 - **Answer-now short-circuit**, planner can return a direct answer when evidence already suffices.
 - **Tight steering**, tool descriptions and intent classifier target agent subtask shape, not literal user wording.
@@ -53,10 +53,10 @@ Recommended stack:
 Rule of thumb:
 
 - broad or fresh task -> `codesight_*` or `read`
-- grounded symbol, caller, or usage task -> `pi_lsp_*`
+- grounded symbol, caller, or usage task -> `code_nav_*`
 - IDE-style semantic op -> raw `lsp_navigation`
 - cheap local confirmation in already-open file -> `read`
-- undecided or compound task -> `pi_lsp_plan_navigation`
+- undecided or compound task -> `code_nav_plan_navigation`
 
 ## Guidance for users
 
@@ -74,44 +74,70 @@ The agent picks the right tool. Slash commands are available for direct control.
 
 All tools are registered on Pi load.
 
-### `pi_lsp_get_symbol`
+### `code_nav_get_symbol`
 Read one exact grounded symbol definition with minimal code.
 - Input: `symbol` (required), `file`, `includeBody`, `contextLines`.
 - Best when current subtask is minimal implementation inspection.
 - Returns: compact slice, location, owning file, jump-ready next-step hints.
 
-### `pi_lsp_find_definition`
+### `code_nav_find_definition`
 Find the exact definition location of a grounded symbol.
 - Input: `symbol` (required), `file`.
 - Best when the subtask is resolving the owning file or line.
 - Returns: file, line, character, next-step hints.
 
-### `pi_lsp_find_references`
+### `code_nav_find_references`
 Find usages of a grounded symbol, grouped by file, caller file prioritized.
 - Input: `symbol` (required), `file`, `limit`.
 - Best when the subtask is caller tracing, usage tracing, or impact.
 - Returns: grouped hits, top caller file, next-step hints.
 
-### `pi_lsp_rank_context`
+### `code_nav_rank_context`
 Prioritize files and symbols already observed inside this Pi session.
 - Input: `query`, `limit`.
 - Does not explore the repo. Ranks in-memory session state only.
 - Returns: ranked items, session state counts, guidance, fresh-session warning if empty.
 
-### `pi_lsp_plan_navigation`
+### `code_nav_plan_navigation`
 Plan the next 1-4 navigation hops.
 - Input: `task` (required), `symbol`, `file`, `mode`, `limit`.
 - Returns: intent, best route, next tool, next args, fallback steps, stop conditions, evidence snapshot.
-- Possible routes: `codesight`, `pi_lsp`, `lsp_navigation`, `read`, `answer`.
+- Possible routes: `codesight`, `code_nav`, `lsp_navigation`, `read`, `answer`.
+
+## Multi-language support
+
+`code_nav_*` symbol navigation works across all languages supported by `ast_grep_search`. The fallback scanner reads source files and applies language-aware declaration patterns.
+
+| Language | Extensions | Declaration patterns |
+|---|---|---|
+| TypeScript / JS | `.ts .tsx .js .jsx .mjs .cjs` | `function`, `class`, `interface`, `type`, `enum`, `const` |
+| CSS / SCSS / Sass | `.css .scss .sass .less` | `.class {`, `#id {` |
+| Python | `.py` | `def`, `class`, `async def` |
+| Go | `.go` | `func`, `type` |
+| Rust | `.rs` | `fn`, `struct`, `impl`, `trait`, `enum` |
+| Java / Kotlin | `.java .kt .kts` | `class`, `interface` |
+| Ruby | `.rb` | `def`, `class`, `module` |
+| PHP | `.php` | `function`, `class` |
+| Swift | `.swift` | `func`, `class`, `struct`, `protocol` |
+| Dart | `.dart` | `class`, `void` |
+| Elixir | `.ex .exs` | `def`, `defmodule` |
+| Scala | `.scala` | `def`, `class`, `object`, `trait` |
+| HTML | `.html .htm` | tag / class / id patterns |
+| Lua | `.lua` | `function`, `local function` |
+| Haskell | `.hs` | symbol at line start |
+
+No install or config required. Language is detected automatically from file extension.
+
+> **Note:** LSP semantic navigation (`lsp_navigation`) remains TypeScript-only. The `code_nav_*` tools use the fallback text-scan and ast-grep backends for non-TypeScript languages.
 
 ## Slash commands
 
 Slash commands are a direct control surface. Useful in interactive Pi sessions.
 
-- `/symbol <name> [fileHint]`, run `pi_lsp_get_symbol`.
-- `/refs <name> [fileHint]`, run `pi_lsp_find_references`.
-- `/rank <task>`, run `pi_lsp_rank_context`.
-- `/nav <task>`, run `pi_lsp_plan_navigation`.
+- `/symbol <name> [fileHint]`, run `code_nav_get_symbol`.
+- `/refs <name> [fileHint]`, run `code_nav_find_references`.
+- `/rank <task>`, run `code_nav_rank_context`.
+- `/nav <task>`, run `code_nav_plan_navigation`.
 
 After manifest changes, run `pi update` or reinstall the package so new commands register.
 
@@ -121,7 +147,7 @@ After manifest changes, run `pi update` or reinstall the package so new commands
 
 ```ts
 type PlannerStatus = 'needs-discovery' | 'grounded-next-hop' | 'needs-narrowing' | 'answer-now';
-type ToolRouteFamily = 'codesight' | 'pi_lsp' | 'lsp_navigation' | 'read' | 'answer';
+type ToolRouteFamily = 'codesight' | 'code_nav' | 'lsp_navigation' | 'read' | 'answer';
 
 interface NavigationPlan {
   intent: 'inspect' | 'define' | 'trace' | 'impact' | 'debug' | 'discover' | 'explain';
@@ -184,24 +210,24 @@ Agent path: discovery first, then grounded symbol hop, then reads minimal code.
 ```text
 Show the implementation of registerPiLspTools.
 ```
-Agent path: `pi_lsp_get_symbol`.
+Agent path: `code_nav_get_symbol`.
 
 ```text
 Where is registerPiLspTools used across the repo?
 ```
-Agent path: `pi_lsp_find_references`.
+Agent path: `code_nav_find_references`.
 
 ```text
 Where is registerPiLspTools defined?
 ```
-Agent path: `pi_lsp_find_definition`, or answer-now if already grounded in session.
+Agent path: `code_nav_find_definition`, or answer-now if already grounded in session.
 
 ### Planner-first
 
 ```text
 Plan the next navigation move to debug a possible tool registration issue.
 ```
-Agent path: `pi_lsp_plan_navigation`. Returns next tool + args or answer-now.
+Agent path: `code_nav_plan_navigation`. Returns next tool + args or answer-now.
 
 ### Interactive slash
 

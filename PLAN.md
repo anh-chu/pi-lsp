@@ -13,8 +13,8 @@ Drop `npm:pi-lens` entirely. Keep `ast_grep_search` / `ast_grep_replace` as stan
 - `ast_grep_search` — genuinely better than `grep` for structural/semantic code patterns
 - `ast_grep_replace` — no good substitute for batch structural refactor; worth keeping
 - `lsp_navigation` — cursor-position-dependent ops (hover, signatureHelp) rarely usable by agents;
-  definition/references already covered by pi-code-nav's `pi_lsp_*` tools; omitted
-- pi-code-nav (`pi_lsp_*` tools) calls `ast_grep_search` internally as a backend —
+  definition/references already covered by pi-code-nav's `code_nav_*` tools; omitted
+- pi-code-nav (`code_nav_*` tools) calls `ast_grep_search` internally as a backend —
   must remain registered or pi-code-nav degrades
 
 ## What changes
@@ -107,7 +107,7 @@ Add two `pi.registerTool()` calls alongside existing tool registrations. No new 
 2. `pi update` to pull new version
 3. `pi uninstall npm:pi-lens`
 4. Run `pi` — verify `ast_grep_search` and `ast_grep_replace` tools appear
-5. Verify `pi_lsp_find_references` still works (uses ast_grep_search as backend)
+5. Verify `code_nav_find_references` still works (uses ast_grep_search as backend)
 
 ## Out of scope
 

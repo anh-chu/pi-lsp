@@ -57,7 +57,7 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
         primary: 'lsp_navigation',
         toolName: 'lsp_navigation',
         args,
-        reason: 'Raw IDE-style semantic op fits better than pi_lsp_* wrapper here.',
+        reason: 'Raw IDE-style semantic op fits better than code_nav_* wrapper here.',
       };
       steps.push(step(1, 'lsp_navigation', 'lsp_navigation', bestRoute.reason, args, true));
       if (args.operation === 'workspaceSymbol' && intentResult.rawLspOperation !== 'workspaceSymbol') {
@@ -90,11 +90,11 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
           primary: 'codesight',
           toolName: 'codesight_get_summary',
           args: {},
-          reason: 'Task still ungrounded. Start with repo discovery, not pi_lsp_rank_context.',
+          reason: 'Task still ungrounded. Start with repo discovery, not code_nav_rank_context.',
         };
     steps.push(step(1, bestRoute.primary, bestRoute.toolName ?? 'read', bestRoute.reason, bestRoute.args, true));
     fallbackSteps.push(step(1, 'codesight', 'codesight_get_hot_files', 'If task still broad, inspect high-impact files or relevant subsystem next.', { limit }, true));
-    stopWhen.push('Stop discovery once exact symbol name or file is grounded.', 'Do not call pi_lsp_* until exact symbol or caller target is known.');
+    stopWhen.push('Stop discovery once exact symbol name or file is grounded.', 'Do not call code_nav_* until exact symbol or caller target is known.');
   } else if (intentResult.intent === 'define') {
     const matchesLastDefinition = evidence.lastResolvedDefinition?.symbol === evidence.symbol;
     if (matchesLastDefinition && evidence.lastResolvedDefinition?.file) {
@@ -106,12 +106,12 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
       stopWhen.push(`Answer with ${evidence.lastResolvedDefinition.file}:${evidence.lastResolvedDefinition.line}.`);
     } else {
       bestRoute = {
-        primary: 'pi_lsp',
-        toolName: 'pi_lsp_find_definition',
+        primary: 'code_nav',
+        toolName: 'code_nav_find_definition',
         args: { symbol: evidence.symbol, file: evidence.file },
         reason: 'Exact symbol grounded. Definition-first hop is shortest path.',
       };
-      steps.push(step(1, 'pi_lsp', 'pi_lsp_find_definition', bestRoute.reason, bestRoute.args, true));
+      steps.push(step(1, 'code_nav', 'code_nav_find_definition', bestRoute.reason, bestRoute.args, true));
       fallbackSteps.push(step(1, 'codesight', 'codesight_get_summary', 'If exact symbol still fails, verify repo area and name first.', {}, true));
       stopWhen.push('Stop if definition file and line answer request directly.');
     }
@@ -126,24 +126,24 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
       stopWhen.push(`Answer with strongest caller file first: ${evidence.lastTopCallerFiles[0]?.file ?? 'unknown'}.`);
     } else {
       bestRoute = {
-        primary: 'pi_lsp',
-        toolName: 'pi_lsp_find_references',
+        primary: 'code_nav',
+        toolName: 'code_nav_find_references',
         args: { symbol: evidence.symbol, file: evidence.file, limit },
         reason: 'Grouped references give best first caller or impact hop.',
       };
-      steps.push(step(1, 'pi_lsp', 'pi_lsp_find_references', bestRoute.reason, bestRoute.args, true));
+      steps.push(step(1, 'code_nav', 'code_nav_find_references', bestRoute.reason, bestRoute.args, true));
       fallbackSteps.push(step(1, 'read', 'read', 'If refs return strong caller file, read only that caller next.', evidence.lastTopCallerFiles[0] ? { path: evidence.lastTopCallerFiles[0].file } : undefined, true));
       stopWhen.push('Stop if grouped hits already answer simple usage question.', 'Inspect only best caller file before expanding to rest of impact list.');
     }
   } else if (intentResult.intent === 'inspect') {
     bestRoute = {
-      primary: 'pi_lsp',
-      toolName: 'pi_lsp_get_symbol',
+      primary: 'code_nav',
+      toolName: 'code_nav_get_symbol',
       args: { symbol: evidence.symbol, file: evidence.file, includeBody: true },
       reason: 'Exact symbol grounded. Minimal body slice is best next hop.',
     };
-    steps.push(step(1, 'pi_lsp', 'pi_lsp_get_symbol', bestRoute.reason, bestRoute.args, true));
-    fallbackSteps.push(step(1, 'pi_lsp', 'pi_lsp_find_definition', 'If file hint still wrong, resolve owning file first.', { symbol: evidence.symbol, file: evidence.file }, true));
+    steps.push(step(1, 'code_nav', 'code_nav_get_symbol', bestRoute.reason, bestRoute.args, true));
+    fallbackSteps.push(step(1, 'code_nav', 'code_nav_find_definition', 'If file hint still wrong, resolve owning file first.', { symbol: evidence.symbol, file: evidence.file }, true));
     stopWhen.push('Stop if symbol body already answers request.');
   } else {
     bestRoute = evidence.file
@@ -151,7 +151,7 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
           primary: 'read',
           toolName: 'read',
           args: { path: evidence.file },
-          reason: 'Task not exact enough for pi_lsp_* yet. Narrow with current source first.',
+          reason: 'Task not exact enough for code_nav_* yet. Narrow with current source first.',
         }
       : {
           primary: 'codesight',
@@ -162,7 +162,7 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
     status = bestRoute.primary === 'read' ? 'needs-narrowing' : 'needs-discovery';
     steps.push(step(1, bestRoute.primary, bestRoute.toolName ?? 'read', bestRoute.reason, bestRoute.args, true));
     if (evidence.symbol) {
-      steps.push(step(2, 'pi_lsp', 'pi_lsp_get_symbol', 'Once current source confirms symbol, take exact body slice.', { symbol: evidence.symbol, file: evidence.file }, true));
+      steps.push(step(2, 'code_nav', 'code_nav_get_symbol', 'Once current source confirms symbol, take exact body slice.', { symbol: evidence.symbol, file: evidence.file }, true));
     }
     fallbackSteps.push(step(1, 'codesight', 'codesight_get_hot_files', 'If still broad, inspect top-impact files instead of thrashing across random reads.', { limit }, true));
     stopWhen.push('Stop once one concrete file or symbol becomes grounded enough for exact follow-up.');

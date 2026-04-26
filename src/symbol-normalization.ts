@@ -2,6 +2,39 @@ import { resolve } from 'node:path';
 import type { SymbolCandidate } from './types.ts';
 import type { BackendName, MatchKind, ToolInvoker } from './symbol-backends.ts';
 
+// ─── Language detection ──────────────────────────────────────────────────────
+
+const EXT_MAP: Record<string, string> = {
+  ts: 'typescript',
+  tsx: 'typescript',
+  mts: 'typescript',
+  cts: 'typescript',
+  js: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  jsx: 'javascript',
+  css: 'css',
+  scss: 'css',
+  less: 'css',
+  py: 'python',
+  pyw: 'python',
+  go: 'go',
+  rs: 'rust',
+  rlib: 'rust',
+  java: 'java',
+  kt: 'kotlin',
+  kts: 'kotlin',
+  rb: 'ruby',
+  erb: 'ruby',
+  php: 'php',
+  swift: 'swift',
+};
+
+export function detectLangFromExt(ext: string): string {
+  const cleaned = ext.replace(/^\./, '').toLowerCase();
+  return EXT_MAP[cleaned] ?? 'typescript';
+}
+
 export interface DocumentSymbolLike {
   name?: string;
   kind?: number | string;
@@ -123,23 +156,109 @@ export function classifyNameMatch(name: string, symbol: string): MatchKind {
   return name.toLowerCase().includes(symbol.toLowerCase()) ? 'partial' : 'partial';
 }
 
-export function declarationSearchPatterns(symbol: string): string[] {
-  return [
-    `function ${symbol}`,
-    `class ${symbol}`,
-    `interface ${symbol}`,
-    `type ${symbol}`,
-    `enum ${symbol}`,
-    `const ${symbol}`,
-    `let ${symbol}`,
-    `var ${symbol}`,
-  ];
+export function declarationSearchPatterns(symbol: string, lang?: string): string[] {
+  switch (lang) {
+    case 'css':
+      return [
+        `.${symbol} {`,
+        `.${symbol}:`,
+        `#${symbol} {`,
+        `#${symbol}:`,
+        `${symbol} {`,
+      ];
+    case 'python':
+      return [
+        `def ${symbol}`,
+        `class ${symbol}`,
+        `async def ${symbol}`,
+      ];
+    case 'go':
+      return [
+        `func ${symbol}`,
+        `func (`,
+      ];
+    case 'rust':
+      return [
+        `fn ${symbol}`,
+        `struct ${symbol}`,
+        `impl ${symbol}`,
+        `trait ${symbol}`,
+        `enum ${symbol}`,
+        `type ${symbol}`,
+      ];
+    case 'java':
+    case 'kotlin':
+      return [
+        `class ${symbol}`,
+        `interface ${symbol}`,
+        `void ${symbol}`,
+        `public ${symbol}`,
+      ];
+    case 'ruby':
+      return [
+        `def ${symbol}`,
+        `class ${symbol}`,
+        `module ${symbol}`,
+      ];
+    case 'php':
+      return [
+        `function ${symbol}`,
+        `class ${symbol}`,
+      ];
+    case 'swift':
+      return [
+        `func ${symbol}`,
+        `class ${symbol}`,
+        `struct ${symbol}`,
+        `protocol ${symbol}`,
+      ];
+    case 'typescript':
+    case 'javascript':
+    default:
+      return [
+        `function ${symbol}`,
+        `class ${symbol}`,
+        `interface ${symbol}`,
+        `type ${symbol}`,
+        `enum ${symbol}`,
+        `const ${symbol}`,
+        `let ${symbol}`,
+        `var ${symbol}`,
+      ];
+  }
 }
 
-export function extractAstCandidateName(preview: string, fallback: string): string | null {
-  const regex = /\b(function|class|interface|type|enum|const|let|var)\s+([A-Za-z_$][\w$]*)\b/;
-  const match = regex.exec(preview);
-  return match?.[2] ?? (preview.includes(fallback) ? fallback : null);
+export function extractAstCandidateName(preview: string, fallback: string, lang?: string): string | null {
+  switch (lang) {
+    case 'css': {
+      const cssMatch = /[.#]([A-Za-z_-][\w-]*)\s*[{:]/.exec(preview);
+      if (cssMatch) return cssMatch[1];
+      // Bare element selector: "div {"
+      const elemMatch = /^\s*([A-Za-z_-][\w-]*)\s*\{/.exec(preview);
+      return elemMatch?.[1] ?? (preview.includes(fallback) ? fallback : null);
+    }
+    case 'python': {
+      const pyMatch = /(?:async\s+)?def\s+([A-Za-z_][\w]*)\b/.exec(preview);
+      if (pyMatch) return pyMatch[1];
+      const pyClassMatch = /class\s+([A-Za-z_][\w]*)\b/.exec(preview);
+      return pyClassMatch?.[1] ?? (preview.includes(fallback) ? fallback : null);
+    }
+    case 'go': {
+      const goMatch = /func\s+([A-Za-z_][\w]*)\b/.exec(preview);
+      return goMatch?.[1] ?? (preview.includes(fallback) ? fallback : null);
+    }
+    case 'rust': {
+      const rustMatch = /(?:fn|struct|impl|trait|enum|type)\s+([A-Za-z_][\w]*)\b/.exec(preview);
+      return rustMatch?.[1] ?? (preview.includes(fallback) ? fallback : null);
+    }
+    case 'typescript':
+    case 'javascript':
+    default: {
+      const regex = /\b(function|class|interface|type|enum|const|let|var)\s+([A-Za-z_$][\w$]*)\b/;
+      const match = regex.exec(preview);
+      return match?.[2] ?? (preview.includes(fallback) ? fallback : null);
+    }
+  }
 }
 
 export function containsSymbolReference(line: string, symbol: string) {
@@ -157,13 +276,13 @@ export function classifyReferenceMatchKind(line: string, symbol: string): MatchK
   return line.toLowerCase().includes(symbol.toLowerCase()) ? 'partial' : 'partial';
 }
 
-export function classifyDeclaration(line: string, symbol: string): SymbolCandidate['kind'] | null {
-  const exactPatterns = declarationPatterns(symbol);
+export function classifyDeclaration(line: string, symbol: string, lang?: string): SymbolCandidate['kind'] | null {
+  const exactPatterns = declarationPatterns(symbol, '', lang);
   for (const [kind, pattern] of exactPatterns) {
     if (pattern.test(line)) return kind;
   }
 
-  const insensitivePatterns = declarationPatterns(symbol, 'i');
+  const insensitivePatterns = declarationPatterns(symbol, 'i', lang);
   for (const [kind, pattern] of insensitivePatterns) {
     if (pattern.test(line)) return kind;
   }
@@ -171,27 +290,83 @@ export function classifyDeclaration(line: string, symbol: string): SymbolCandida
   return null;
 }
 
-export function classifyMatchKind(line: string, symbol: string): MatchKind {
-  for (const [, pattern] of declarationPatterns(symbol)) {
+export function classifyMatchKind(line: string, symbol: string, lang?: string): MatchKind {
+  for (const [, pattern] of declarationPatterns(symbol, '', lang)) {
     if (pattern.test(line)) return 'exact';
   }
-  for (const [, pattern] of declarationPatterns(symbol, 'i')) {
+  for (const [, pattern] of declarationPatterns(symbol, 'i', lang)) {
     if (pattern.test(line)) return 'case-insensitive';
   }
   return line.toLowerCase().includes(symbol.toLowerCase()) ? 'partial' : 'partial';
 }
 
-export function declarationPatterns(symbol: string, flags = ''): Array<[SymbolCandidate['kind'], RegExp]> {
+export function declarationPatterns(symbol: string, flags = '', lang?: string): Array<[SymbolCandidate['kind'], RegExp]> {
   const escaped = escapeRegExp(symbol);
-  return [
-    ['function', new RegExp(`\\bfunction\\s+${escaped}\\b`, flags)],
-    ['class', new RegExp(`\\bclass\\s+${escaped}\\b`, flags)],
-    ['interface', new RegExp(`\\binterface\\s+${escaped}\\b`, flags)],
-    ['type', new RegExp(`\\btype\\s+${escaped}\\b`, flags)],
-    ['enum', new RegExp(`\\benum\\s+${escaped}\\b`, flags)],
-    ['const', new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b`, flags)],
-    ['method', new RegExp(`\\b${escaped}\\s*\\([^)]*\\)\\s*\\{`, flags)],
-  ];
+  switch (lang) {
+    case 'css':
+      return [
+        ['class', new RegExp(`\\.${escaped}\\s*[{:]`, flags)],
+        ['const', new RegExp(`#${escaped}\\s*[{:]`, flags)],
+        ['function', new RegExp(`^\\s*${escaped}\\s*\\{\\s*$`, flags)],
+      ];
+    case 'python':
+      return [
+        ['function', new RegExp(`(?:async\\s+)?def\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`class\\s+${escaped}\\b`, flags)],
+      ];
+    case 'go':
+      return [
+        ['function', new RegExp(`func\\s+${escaped}\\b`, flags)],
+        ['function', new RegExp(`func\\s+\\([^)]+\\)\\s+${escaped}\\b`, flags)],
+      ];
+    case 'rust':
+      return [
+        ['function', new RegExp(`fn\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`struct\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`impl\\s+${escaped}\\b`, flags)],
+        ['interface', new RegExp(`trait\\s+${escaped}\\b`, flags)],
+        ['enum', new RegExp(`enum\\s+${escaped}\\b`, flags)],
+        ['type', new RegExp(`type\\s+${escaped}\\b`, flags)],
+      ];
+    case 'java':
+    case 'kotlin':
+      return [
+        ['class', new RegExp(`class\\s+${escaped}\\b`, flags)],
+        ['interface', new RegExp(`interface\\s+${escaped}\\b`, flags)],
+        ['function', new RegExp(`void\\s+${escaped}\\b`, flags)],
+        ['function', new RegExp(`public\\s+${escaped}\\b`, flags)],
+      ];
+    case 'ruby':
+      return [
+        ['function', new RegExp(`def\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`class\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`module\\s+${escaped}\\b`, flags)],
+      ];
+    case 'php':
+      return [
+        ['function', new RegExp(`function\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`class\\s+${escaped}\\b`, flags)],
+      ];
+    case 'swift':
+      return [
+        ['function', new RegExp(`func\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`class\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`struct\\s+${escaped}\\b`, flags)],
+        ['interface', new RegExp(`protocol\\s+${escaped}\\b`, flags)],
+      ];
+    case 'typescript':
+    case 'javascript':
+    default:
+      return [
+        ['function', new RegExp(`\\bfunction\\s+${escaped}\\b`, flags)],
+        ['class', new RegExp(`\\bclass\\s+${escaped}\\b`, flags)],
+        ['interface', new RegExp(`\\binterface\\s+${escaped}\\b`, flags)],
+        ['type', new RegExp(`\\btype\\s+${escaped}\\b`, flags)],
+        ['enum', new RegExp(`\\benum\\s+${escaped}\\b`, flags)],
+        ['const', new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b`, flags)],
+        ['method', new RegExp(`\\b${escaped}\\s*\\([^)]*\\)\\s*\\{`, flags)],
+      ];
+  }
 }
 
 export function matchScore(kind: MatchKind) {
