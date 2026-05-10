@@ -36,7 +36,7 @@ Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discove
 ## Value props
 
 - **Grounded symbol navigation**, minimal slices, definition location, grouped references.
-- **Navigation planner**, bounded 1-4 hop plan across `codesight_*`, `code_nav_*`, `lsp_navigation`, `read`, and answer-now.
+- **Navigation planner**, bounded 1-4 hop plan across discovery tools, `code_nav_*`, `lsp_navigation`, `read`, and answer-now.
 - **Session-aware reuse**, resolved definitions, top caller files, and queried symbols persist inside the session.
 - **Answer-now short-circuit**, planner can return a direct answer when evidence already suffices.
 - **Tight steering**, tool descriptions and intent classifier target agent subtask shape, not literal user wording.
@@ -102,7 +102,7 @@ Prioritize files and symbols already observed inside this Pi session.
 Plan the next 1-4 navigation hops.
 - Input: `task` (required), `symbol`, `file`, `mode`, `limit`.
 - Returns: intent, best route, next tool, next args, fallback steps, stop conditions, evidence snapshot.
-- Possible routes: `codesight`, `code_nav`, `lsp_navigation`, `read`, `answer`.
+- Possible routes: `discovery`, `code_nav`, `lsp_navigation`, `read`, `answer`.
 
 ## Multi-language support
 
@@ -147,7 +147,7 @@ After manifest changes, run `pi update` or reinstall the package so new commands
 
 ```ts
 type PlannerStatus = 'needs-discovery' | 'grounded-next-hop' | 'needs-narrowing' | 'answer-now';
-type ToolRouteFamily = 'codesight' | 'code_nav' | 'lsp_navigation' | 'read' | 'answer';
+type ToolRouteFamily = 'discovery' | 'code_nav' | 'lsp_navigation' | 'read' | 'answer';
 
 interface NavigationPlan {
   intent: 'inspect' | 'define' | 'trace' | 'impact' | 'debug' | 'discover' | 'explain';

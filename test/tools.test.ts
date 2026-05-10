@@ -75,7 +75,7 @@ test('getSymbolSlice returns explicit failure for missing symbol with anti-guess
     assert.equal(result.details.likelyCause, 'inexact-symbol-name');
     assert.match(result.content, /no exact definition candidate found/i);
     assert.match(result.content, /guessed or approximate symbol name/i);
-    assert.match(result.content, /use codesight_\*/i);
+    assert.match(result.content, /use discovery tools/i);
     assert.equal(Array.isArray(result.details.suggestedNextSteps), true);
   });
 });

@@ -42,7 +42,7 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
   const ambiguous = symbolResult.details.ambiguous === true;
   const status: DefinitionResult['details']['status'] = ok ? 'resolved' : (ambiguous ? 'ambiguous' : 'not-found');
   const owningFile = location?.file;
-  const nextBestTool = ok ? 'code_nav_get_symbol' : (ambiguous ? 'code_nav_get_symbol' : 'codesight_*');
+  const nextBestTool = ok ? 'code_nav_get_symbol' : (ambiguous ? 'code_nav_get_symbol' : 'find');
   const nextBestArgs = ok
     ? { symbol: params.symbol, file: owningFile, includeBody: true }
     : (ambiguous ? { symbol: params.symbol, file: params.file } : { query: params.symbol });
@@ -59,10 +59,10 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
     : (ambiguous
         ? [
             'Pass a narrower file hint to code_nav_get_symbol to choose the intended candidate.',
-            'If the owning file is still unknown, use codesight_* for repo-level discovery first.',
+            'If the owning file is still unknown, use discovery tools (e.g., find, read) for repo-level exploration first.',
           ]
         : [
-            'Use codesight_* or current source to confirm the exact symbol name or file.',
+            'Use discovery tools (e.g., find, read) or current source to confirm the exact symbol name or file.',
             'Retry code_nav_find_definition only after the name is grounded exactly.',
           ]);
 
@@ -84,8 +84,8 @@ export async function findDefinition(params: DefinitionQuery, options: Resolutio
       ok
         ? '- next: answer immediately if the resolved definition already satisfies the request; only call another code_nav_* tool when deeper tracing is explicitly needed'
         : (ambiguous
-            ? '- next: pass a narrower file hint to code_nav_get_symbol or use codesight_* to disambiguate'
-            : '- next: use codesight_* or current source to ground the exact symbol name before retrying'),
+            ? '- next: pass a narrower file hint to code_nav_get_symbol or use discovery tools to disambiguate'
+            : '- next: use discovery tools or current source to ground the exact symbol name before retrying'),
     ]),
     details: {
       symbol: params.symbol,
@@ -135,9 +135,9 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
         backend: 'fallback',
         ok: false,
         status: 'not-found',
-        suggestedNextTool: 'codesight_*',
+        suggestedNextTool: 'find',
         suggestedNextReason: 'Ground the exact symbol name or file before tracing usages.',
-        suggestedNextArgs: { query: params.symbol },
+        suggestedNextArgs: { pattern: params.symbol },
         suggestedNextSteps: [
           'Confirm the exact symbol name from current source or repo context.',
           'Retry code_nav_find_references with one grounded symbol name.',
@@ -195,7 +195,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       ]
     : [
         'Call code_nav_find_definition first to verify the exact symbol and owning file.',
-        'If names are still uncertain, use codesight_* for repo-level discovery before retrying references.',
+        'If names are still uncertain, use discovery tools (e.g., find, read) for repo-level exploration before retrying references.',
       ];
 
   return {
@@ -222,7 +222,7 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       ...formatReferenceGroups(groupedHits),
       ok
         ? '- next: answer immediately if grouped hits already satisfy the request; inspect the best next caller only when deeper tracing is explicitly needed'
-        : '- next: call code_nav_find_definition first, or use codesight_* if the symbol/path is still not grounded',
+        : '- next: call code_nav_find_definition first, or use discovery tools if the symbol/path is still not grounded',
     ]),
     details: {
       symbol,
@@ -314,7 +314,7 @@ export async function getSymbolSlice(params: SymbolQuery, options: ResolutionOpt
       '- result: no exact definition candidate found',
       '- likely cause: guessed or approximate symbol name did not match current source exactly',
       '- next: verify exact exported symbol name from current source before retrying; do not keep guessing variants of the name',
-      '- hint: use codesight_* for fresh repo/path discovery, and reserve code_nav_* for exact symbol or caller follow-up once names are grounded',
+      '- hint: use discovery tools (find, read) for fresh repo/path exploration, and reserve code_nav_* for exact symbol or caller follow-up once names are grounded',
     ]),
     details: {
       symbol: exactQuery,
@@ -325,7 +325,7 @@ export async function getSymbolSlice(params: SymbolQuery, options: ResolutionOpt
       likelyCause: 'inexact-symbol-name',
       suggestedNextSteps: [
         'Verify the exact symbol name from current source before retrying; do not keep guessing variants.',
-        'Use codesight_* first for repo-level discovery when the symbol/path is not yet grounded.',
+        'Use discovery tools (find, read) first for repo-level exploration when the symbol/path is not yet grounded.',
         'Retry code_nav_get_symbol with an exact symbol name or a narrower file hint.',
       ],
     },

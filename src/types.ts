@@ -20,7 +20,7 @@ export type NavigationIntent = 'discover' | 'define' | 'inspect' | 'trace' | 'im
 export type NavigationMode = 'auto' | 'inspect' | 'trace' | 'impact' | 'debug' | 'explain';
 export type PlannerStatus = 'needs-discovery' | 'grounded-next-hop' | 'needs-narrowing' | 'answer-now';
 export type PlannerConfidence = 'low' | 'medium' | 'high';
-export type ToolRouteFamily = 'codesight' | 'code_nav' | 'lsp_navigation' | 'read' | 'answer';
+export type ToolRouteFamily = 'discovery' | 'code_nav' | 'lsp_navigation' | 'read' | 'answer';
 
 export interface SymbolLocation {
   file: string;
@@ -65,10 +65,10 @@ export interface DefinitionResult {
     candidates?: unknown;
     confidence?: 'high' | 'medium' | 'low';
     owningFile?: string;
-    nextBestTool?: 'code_nav_get_symbol' | 'code_nav_find_references' | 'codesight_*' | 'read';
+    nextBestTool?: string;
     nextBestReason?: string;
     nextBestArgs?: Record<string, unknown>;
-    suggestedNextTool?: 'code_nav_get_symbol' | 'code_nav_find_references' | 'codesight_*' | 'read';
+    suggestedNextTool?: string;
     suggestedNextReason?: string;
     suggestedNextArgs?: Record<string, unknown>;
     suggestedNextSteps?: string[];
@@ -134,10 +134,10 @@ export interface ReferenceResult {
     definitionFallback?: boolean;
     ok?: boolean;
     owningFile?: string;
-    nextBestTool?: 'code_nav_get_symbol' | 'code_nav_find_definition' | 'codesight_*' | 'read';
+    nextBestTool?: string;
     nextBestReason?: string;
     nextBestArgs?: Record<string, unknown>;
-    suggestedNextTool?: 'code_nav_get_symbol' | 'code_nav_find_definition' | 'codesight_*' | 'read';
+    suggestedNextTool?: string;
     suggestedNextReason?: string;
     suggestedNextArgs?: Record<string, unknown>;
     suggestedNextSteps?: string[];
@@ -177,6 +177,7 @@ export interface ToolRoute {
   toolName?: string;
   args?: Record<string, unknown>;
   reason: string;
+  ladderPosition?: 1 | 2 | 3 | 4;
 }
 
 export interface NavigationStep {
@@ -186,6 +187,7 @@ export interface NavigationStep {
   args?: Record<string, unknown>;
   reason: string;
   stopIfResolved?: boolean;
+  ladderPosition?: 1 | 2 | 3 | 4;
 }
 
 export interface EvidenceSnapshot {

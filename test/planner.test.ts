@@ -25,8 +25,8 @@ test('planner routes impact task to references tool', () => {
 test('planner sends fresh session to discovery first', () => {
   const plan = planNavigation({ task: 'What should I inspect next for route parsing bug?' });
   assert.equal(plan.freshSession, true);
-  assert.equal(plan.bestRoute.primary, 'codesight');
-  assert.equal(plan.nextTool, 'codesight_get_summary');
+  assert.equal(plan.bestRoute.primary, 'discovery');
+  assert.equal(plan.nextTool, 'find');
 });
 
 test('planner routes hover-style question to raw lsp_navigation', () => {
@@ -76,4 +76,29 @@ test('planner recognizes "location of" as define intent', () => {
 test('planner treats "inspect" word without code noun as non-inspect', () => {
   const plan = planNavigation({ task: 'Inspect something broad in this repo' });
   assert.notEqual(plan.intent, 'inspect');
+});
+
+test('planner detects cross-subsystem bug and orients on one subsystem first', () => {
+  const plan = planNavigation({ task: 'Bug touches 3 subsystems' });
+  assert.equal(plan.intent, 'debug');
+  assert.equal(plan.bestRoute.primary, 'discovery');
+  assert.equal(plan.nextTool, 'find');
+  assert.equal(plan.status, 'needs-discovery');
+  assert.ok(plan.bestRoute.reason.includes('ONE subsystem'));
+  assert.ok(plan.stopWhen.some((s) => s.includes('Do not read all subsystem docs')));
+});
+
+test('planner routes cross-subsystem bug with grounded symbol to references', () => {
+  const plan = planNavigation({ task: 'Bug across auth and billing subsystems', symbol: 'createInvoice', file: 'src/billing.ts' });
+  assert.equal(plan.intent, 'debug');
+  assert.equal(plan.bestRoute.primary, 'code_nav');
+  assert.equal(plan.nextTool, 'code_nav_find_references');
+  assert.ok(plan.bestRoute.reason.toLowerCase().includes('cross-subsystem'));
+  assert.ok(plan.stopWhen.some((s) => s.includes('boundary calls')));
+});
+
+test('planner does not flag single-subsystem bug as cross-subsystem', () => {
+  const plan = planNavigation({ task: 'Bug in auth login flow' });
+  assert.equal(plan.intent, 'debug');
+  assert.notEqual(plan.bestRoute.reason.includes('ONE subsystem'), true);
 });

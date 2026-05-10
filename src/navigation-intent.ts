@@ -4,10 +4,24 @@ export interface IntentResult {
   intent: NavigationIntent;
   confidence: 'low' | 'medium' | 'high';
   rawLspOperation?: 'hover' | 'signatureHelp' | 'implementation' | 'incomingCalls' | 'outgoingCalls' | 'rename' | 'workspaceSymbol';
+  crossSubsystem?: boolean;
 }
 
 function hasAny(text: string, patterns: RegExp[]) {
   return patterns.some((pattern) => pattern.test(text));
+}
+
+function isCrossSubsystem(text: string): boolean {
+  return hasAny(text, [
+    /cross.{0,20}(subsystem|module|boundary)/,
+    /across.{0,30}(subsystems|modules|boundaries)/,
+    /between.{0,20}(subsystems|modules)/,
+    /multiple.{0,20}(subsystems|modules)/,
+    /several.{0,20}(subsystems|modules)/,
+    /\d+.{0,20}(subsystems|modules)/,
+    /touches.{0,30}(subsystem|module)/,
+    /spanning.{0,20}(subsystems|modules)/,
+  ]);
 }
 
 export function classifyNavigationIntent(task: string, mode: NavigationMode = 'auto'): IntentResult {
@@ -50,7 +64,7 @@ export function classifyNavigationIntent(task: string, mode: NavigationMode = 'a
   }
 
   if (hasAny(text, [/debug/, /why/, /failing/, /broken/, /error/, /\bbug\b/, /\bfix\b/])) {
-    return { intent: 'debug', confidence: 'medium' };
+    return { intent: 'debug', confidence: 'medium', crossSubsystem: isCrossSubsystem(text) };
   }
 
   if (hasAny(text, [/\brepo\b/, /subsystem/, /\broute\b/, /schema/, /\benv\b/])) {
