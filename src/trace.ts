@@ -21,24 +21,22 @@ async function extractCallerContext(
   let callsInContext: string[] = [];
   let importsFrom: string[] = [];
 
-  if (!invokeTool) {
-    return { callsInContext, importsFrom };
-  }
-
   try {
-    const response = await invokeTool('ast_grep_search', {
-      pattern: '$FUNC($$$ARGS)',
-      lang: file.endsWith('.ts') || file.endsWith('.tsx') ? 'typescript' : file.endsWith('.js') || file.endsWith('.jsx') ? 'javascript' : 'typescript',
-      paths: [file],
-    });
+    if (invokeTool) {
+      const response = await invokeTool('ast_grep_search', {
+        pattern: '$FUNC($$$ARGS)',
+        lang: file.endsWith('.ts') || file.endsWith('.tsx') ? 'typescript' : file.endsWith('.js') || file.endsWith('.jsx') ? 'javascript' : 'typescript',
+        paths: [file],
+      });
 
-    const matches = Array.isArray(response?.matches) ? response.matches : [];
-    for (const match of matches) {
-      const matchLine = match?.range?.start?.line ?? match?.line;
-      if (previewLine && typeof matchLine === 'number' && Math.abs(matchLine - previewLine) > 10) continue;
-      const matchText = match?.text ?? match?.match ?? '';
-      const extracted = extractCallsFromPreview(matchText, symbol);
-      callsInContext.push(...extracted);
+      const matches = Array.isArray(response?.matches) ? response.matches : [];
+      for (const match of matches) {
+        const matchLine = match?.range?.start?.line ?? match?.line;
+        if (previewLine && typeof matchLine === 'number' && Math.abs(matchLine - previewLine) > 10) continue;
+        const matchText = match?.text ?? match?.match ?? '';
+        const extracted = extractCallsFromPreview(matchText, symbol);
+        callsInContext.push(...extracted);
+      }
     }
   } catch {
     // ast_grep not available, fall through
@@ -180,13 +178,13 @@ export async function traceCallChain(params: TraceQuery, options: TraceOptions =
       totalCallers: refResult.hits.length,
       suggestedNextTool: depth > 1 && callers.length > 0 && callers[0].callsInContext.length > 0
         ? 'code_nav_trace'
-        : 'code_nav_get_symbol',
+        : 'read',
       suggestedNextArgs: depth > 1 && callers.length > 0 && callers[0].callsInContext.length > 0
         ? { symbol: callers[0].callsInContext[0], file: callers[0].file, depth: depth - 1 }
-        : { symbol: params.symbol, file: callers[0]?.file ?? params.file, includeBody: true },
+        : { path: callers[0]?.file ?? params.file },
       suggestedNextReason: depth > 1 && callers.length > 0 && callers[0].callsInContext.length > 0
         ? `First caller invokes ${callers[0].callsInContext[0]}; trace it for deeper chain (${depth - 1} hops remaining).`
-        : 'Read the caller body for full context.',
+        : 'Read the caller file for full context of the usage.',
     },
   };
 }

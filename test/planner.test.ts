@@ -114,8 +114,7 @@ test('planner includes phases for fix task', () => {
   const intent = classifyNavigationIntent('fix the auth login bug');
   assert.equal(intent.intent, 'debug');
   assert.ok(intent.phases, 'Expected phases for fix task');
-  assert.ok(intent.phases.length >= 2, 'Expected at least 2 phases');
-  assert.equal(intent.phases[0].intent, 'discover');
+  assert.deepEqual(intent.phases.map((p) => p.intent), ['discover', 'trace', 'inspect']);
   assert.equal(intent.estimatedHops, 3);
 });
 
@@ -123,8 +122,7 @@ test('planner includes phases for implement task', () => {
   const intent = classifyNavigationIntent('implement feature in auth module');
   assert.equal(intent.intent, 'discover');
   assert.ok(intent.phases, 'Expected phases for implement task');
-  assert.equal(intent.phases[0].intent, 'discover');
-  assert.equal(intent.phases[1].intent, 'inspect');
+  assert.deepEqual(intent.phases.map((p) => p.intent), ['discover', 'inspect']);
 });
 
 test('planner routes debug task with grounded symbol to trace', () => {
@@ -174,10 +172,9 @@ test('trace tool respects depth parameter', async () => {
     const tool = findTool(pi, 'code_nav_trace');
     const result = await tool.execute('call-trace-2', { symbol: 'validateUser', depth: 1 });
     assert.equal(result.details.depth, 1);
-    // With depth 1, should suggest get_symbol for follow-up, not another trace
-    if (result.details.callers.length > 0 && result.details.callers[0].callsInContext.length > 0) {
-      assert.equal(result.details.suggestedNextTool, 'code_nav_get_symbol');
-    }
+    assert.ok(result.details.callers.length > 0, 'Expected at least one caller');
+    assert.ok(Array.isArray(result.details.callers[0].callsInContext), 'Expected callsInContext array');
+    assert.equal(result.details.suggestedNextTool, 'read');
   });
 });
 
@@ -192,6 +189,7 @@ test('compare tool registered and returns implementations', async () => {
     const result = await tool.execute('call-compare-1', { symbol: 'handleError' });
     assert.match(result.content[0].text, /Compare result/);
     assert.equal(Array.isArray(result.details.implementations), true);
+    assert.ok(result.details.implementations.length >= 2, 'Expected at least two implementations from fixture');
     assert.equal(Array.isArray(result.details.commonPattern.calls), true);
     assert.equal(Array.isArray(result.details.outliers), true);
   });
