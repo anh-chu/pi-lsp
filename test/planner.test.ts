@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import { registerPiLspTools } from '../src/tools.ts';
 import { planNavigation } from '../src/navigation-planner.ts';
 import { classifyNavigationIntent } from '../src/navigation-intent.ts';
-import { rememberQueriedSymbol, resetState, setLastResolvedDefinition, setLastTopCallerFiles } from '../src/state.ts';
+import { clearCache } from '../src/cache.ts';
+import { rememberQueriedSymbol, resetState, setLastResolvedDefinition, setLastTopCallerFiles, getSymbolRelationships } from '../src/state.ts';
 import { fakePi, findTool, withTempProject } from './helpers.ts';
+import { join } from 'node:path';
 
 test.beforeEach(() => {
   resetState();
+  clearCache();
 });
 
 test('planner routes grounded inspect task to symbol tool', () => {
@@ -206,10 +209,11 @@ test('compare tool fails gracefully with no symbol or pattern', async () => {
 });
 
 test('compare tool uses ast_grep when only pattern is given', async () => {
-  await withTempProject({
+  const files = {
     'src/handlers/user.ts': 'export function handleError(e: Error) { logError(e); }',
     'src/handlers/order.ts': 'export function handleError(e: Error) { logError(e); }',
-  }, async () => {
+  };
+  await withTempProject(files, async (root) => {
     const astGrepCalls: Array<Record<string, unknown>> = [];
     const pi = {
       ...fakePi(),
@@ -218,8 +222,8 @@ test('compare tool uses ast_grep when only pattern is given', async () => {
           astGrepCalls.push(params);
           return {
             matches: [
-              { file: `${process.cwd()}/src/handlers/user.ts`, line: 0, text: 'export function handleError' },
-              { file: `${process.cwd()}/src/handlers/order.ts`, line: 0, text: 'export function handleError' },
+              { file: join(root, 'src/handlers/user.ts'), line: 0, text: 'export function handleError(e: Error) { logError(e); }' },
+              { file: join(root, 'src/handlers/order.ts'), line: 0, text: 'export function handleError(e: Error) { logError(e); }' },
             ],
           };
         }
@@ -230,41 +234,61 @@ test('compare tool uses ast_grep when only pattern is given', async () => {
     };
     registerPiLspTools(pi);
     const tool = findTool(pi, 'code_nav_compare');
-    const result = await tool.execute('call-compare-3', { pattern: 'export function handleError' });
+    const pattern = 'export function handleError($$$ARGS) { $$$BODY }';
+    const result = await tool.execute('call-compare-3', { pattern });
     assert.match(result.content[0].text, /Compare result/);
-    assert.ok(astGrepCalls.length > 0, 'Expected ast_grep_search to be called');
-    assert.ok(result.details.implementations.length > 0, 'Expected implementations from pattern search');
+
+    // Assert ast_grep was called with correct payload
+    assert.equal(astGrepCalls.length, 1);
+    assert.equal(astGrepCalls[0].pattern, pattern);
+    assert.equal(astGrepCalls[0].lang, 'typescript');
+    assert.deepEqual(astGrepCalls[0].paths, [root]);
+
+    // Assert implementations mapped correctly
+    assert.equal(result.details.implementations.length, 2);
+    assert.ok(result.details.implementations[0].file.endsWith('user.ts'));
+    assert.ok(result.details.implementations[1].file.endsWith('order.ts'));
   });
 });
 
 test('findReferences uses definitionFile not owningFile for relationships', async () => {
-  await withTempProject({
+  const files = {
     'src/auth.ts': 'export function validateUser(user: string) { return true; }',
     'src/api.ts': 'import { validateUser } from "./auth";\nexport function login(req: any) { return validateUser(req.body); }',
     'src/admin.ts': 'import { validateUser } from "./auth";\nexport function adminLogin(req: any) { return validateUser(req.token); }',
-  }, async () => {
+  };
+  await withTempProject(files, async (root) => {
     const pi = fakePi();
     registerPiLspTools(pi);
     const tool = findTool(pi, 'code_nav_find_references');
+    // No invokeTool - uses fallback scanner which resolves definitions correctly
     const result = await tool.execute('call-refs-1', { symbol: 'validateUser' });
 
     // The definition file should be src/auth.ts, not src/api.ts (best caller)
-    assert.equal(typeof result.details.definitionFile, 'string');
-    assert.ok(result.details.definitionFile.endsWith('src/auth.ts'), `Expected definition in auth.ts, got ${result.details.definitionFile}`);
+    assert.equal(result.details.definitionFile, join(root, 'src/auth.ts'));
+
+    // Verify relationships use definition file
+    const rels = getSymbolRelationships();
+    const usesRels = rels.filter((r) => r.relationType === 'uses' && r.fromSymbol === 'validateUser');
+    for (const rel of usesRels) {
+      assert.equal(rel.fromFile, join(root, 'src/auth.ts'), `Relationship fromFile should be auth.ts, got ${rel.fromFile}`);
+    }
   });
 });
 
 test('trace tool uses definitionFile for root, not best caller', async () => {
-  await withTempProject({
+  const files = {
     'src/auth.ts': 'export function validateUser(user: string) { return checkDb(user); }\nfunction checkDb(u: string) { return true; }',
     'src/api.ts': 'import { validateUser } from "./auth";\nexport function login(req: any) { return validateUser(req.body); }',
-  }, async () => {
+  };
+  await withTempProject(files, async (root) => {
     const pi = fakePi();
     registerPiLspTools(pi);
     const tool = findTool(pi, 'code_nav_trace');
+    // No invokeTool - uses fallback scanner which resolves definitions correctly
     const result = await tool.execute('call-trace-3', { symbol: 'validateUser' });
 
     // Root should be auth.ts (definition), not api.ts (caller)
-    assert.ok(result.details.root.endsWith('src/auth.ts'), `Expected root in auth.ts, got ${result.details.root}`);
+    assert.equal(result.details.root, join(root, 'src/auth.ts'));
   });
 });

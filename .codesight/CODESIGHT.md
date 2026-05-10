@@ -4,7 +4,7 @@
 
 > 0 routes | 0 models | 0 components | 24 lib files | 5 env vars | 0 middleware | 0% test coverage
 > **Token savings:** this file is ~2,300 tokens. Without it, AI exploration would cost ~16,000 tokens. **Saves ~13,700 tokens per conversation.**
-> **Last scanned:** 2026-05-10 22:17 — re-run after significant changes
+> **Last scanned:** 2026-05-10 22:24 — re-run after significant changes
 
 ---
 
@@ -129,12 +129,12 @@
 - `src/code-context.ts` — imported by **3** files
 - `src/tools.ts` — imported by **3** files
 - `src/symbol-normalization.ts` — imported by **3** files
+- `src/cache.ts` — imported by **3** files
 - `src/plan-format.ts` — imported by **2** files
 - `src/commands.ts` — imported by **2** files
 - `src/navigation-intent.ts` — imported by **2** files
 - `src/sg-runner.ts` — imported by **2** files
 - `src/tools/shared.ts` — imported by **2** files
-- `src/cache.ts` — imported by **2** files
 
 ## Import Map (who imports what)
 

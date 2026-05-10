@@ -16,12 +16,12 @@
 - `src/code-context.ts` — imported by **3** files
 - `src/tools.ts` — imported by **3** files
 - `src/symbol-normalization.ts` — imported by **3** files
+- `src/cache.ts` — imported by **3** files
 - `src/plan-format.ts` — imported by **2** files
 - `src/commands.ts` — imported by **2** files
 - `src/navigation-intent.ts` — imported by **2** files
 - `src/sg-runner.ts` — imported by **2** files
 - `src/tools/shared.ts` — imported by **2** files
-- `src/cache.ts` — imported by **2** files
 
 ## Import Map (who imports what)
 
