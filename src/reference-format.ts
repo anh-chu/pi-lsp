@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
+import { readFileSync } from 'node:fs';
 import type { ReferenceFileGroup, ReferenceHit } from './types.ts';
-import type { BackendName } from './symbol-backends.ts';
+import type { BackendName, ToolInvoker } from './symbol-backends.ts';
 import { strongerConfidence } from './symbol-normalization.ts';
 
 function scoreReferencePreview(hit: ReferenceHit): { priority: number; reason: string } {
@@ -153,12 +154,76 @@ export function formatReferenceGroups(groups: ReferenceFileGroup[]): string[] {
   return groups.slice(0, 8).flatMap((group, index) => {
     const header = `- ${index === 0 ? 'best next caller' : 'impact file'}: ${group.file} (${group.count} hit${group.count === 1 ? '' : 's'}, impact=${group.impactScore ?? 0}, backend=${group.backend}, confidence=${group.confidence}, fallback=${group.fallback ? 'yes' : 'no'})`;
     const reason = group.impactReason ? `  - why: ${group.impactReason}` : null;
+    const role = group.functionRole ? `  - role: ${group.functionRole}` : null;
+    const exported = group.isExported ? '  - exported: yes' : null;
+    const calls = group.callsInContext && group.callsInContext.length > 0 ? `  - calls: ${group.callsInContext.join(', ')}` : null;
+    const imports = group.importsInFile && group.importsInFile.length > 0 ? `  - imports from: ${group.importsInFile.slice(0, 5).join(', ')}` : null;
     const lines = group.lines.slice(0, 3).map((hit, hitIndex) => {
       const label = hitIndex === 0 ? 'top preview' : 'line';
       const priority = typeof hit.previewPriority === 'number' ? `, priority=${hit.previewPriority}` : '';
       const rationale = hit.previewPriorityReason ? `, why=${hit.previewPriorityReason}` : '';
       return `  - ${label} ${hit.line}${hit.character ? `:${hit.character}` : ''}${priority}${rationale}${hit.preview ? ` — ${hit.preview}` : ''}`;
     });
-    return [header, ...(reason ? [reason] : []), ...lines];
+    return [header, ...(reason ? [reason] : []), ...(role ? [role] : []), ...(exported ? [exported] : []), ...(calls ? [calls] : []), ...(imports ? [imports] : []), ...lines];
   });
+}
+
+function inferFunctionRole(filePath: string): string {
+  const lower = filePath.toLowerCase();
+  if (lower.includes('/api/') || lower.includes('/routes/') || lower.includes('/handlers/')) return 'route handler';
+  if (lower.includes('/middleware/')) return 'middleware';
+  if (lower.includes('/test/') || lower.includes('.test.') || lower.includes('.spec.')) return 'test';
+  if (lower.includes('/utils/') || lower.includes('/helpers/')) return 'utility';
+  if (lower.includes('/services/')) return 'service';
+  if (lower.includes('/models/') || lower.includes('/entities/')) return 'model';
+  return 'unknown';
+}
+
+function extractImportsFromLines(lines: string[]): string[] {
+  const imports: string[] = [];
+  for (const line of lines) {
+    const fromMatch = line.match(/from\s+['"]([^'"]+)['"]\s*;?/);
+    if (fromMatch) imports.push(fromMatch[1]!);
+    const requireMatch = line.match(/require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+    if (requireMatch) imports.push(requireMatch[1]!);
+  }
+  return [...new Set(imports)];
+}
+
+function extractCallsFromPreview(preview: string, symbol: string): string[] {
+  const calls: string[] = [];
+  const callPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+  let match;
+  while ((match = callPattern.exec(preview)) !== null) {
+    const name = match[1]!;
+    if (name !== symbol && !['if', 'for', 'while', 'switch', 'catch', 'return', 'await', 'new', 'typeof', 'import', 'require', 'expect', 'describe', 'it', 'test', 'beforeEach', 'afterEach'].includes(name)) {
+      calls.push(name);
+    }
+  }
+  return [...new Set(calls)];
+}
+
+export function enrichReferenceGroup(
+  group: ReferenceFileGroup,
+  symbol: string,
+): void {
+  group.functionRole = inferFunctionRole(group.file);
+
+  const topPreview = group.topPreview?.preview ?? group.lines[0]?.preview ?? '';
+  group.isExported = /\bexport\b/.test(topPreview) || /\bexport\b/.test(group.lines.map((l) => l.preview ?? '').join(' '));
+
+  const allPreviews = group.lines.slice(0, 5).map((l) => l.preview ?? '');
+  const allCalls: string[] = [];
+  for (const preview of allPreviews) {
+    allCalls.push(...extractCallsFromPreview(preview, symbol));
+  }
+  group.callsInContext = [...new Set(allCalls)].slice(0, 10);
+
+  try {
+    const fileContent = readFileSync(group.file, 'utf8');
+    const fileLines = fileContent.split(/\r?\n/);
+    group.importsInFile = extractImportsFromLines(fileLines).slice(0, 10);
+  } catch {
+    group.importsInFile = [];
+  }
 }

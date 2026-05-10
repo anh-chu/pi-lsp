@@ -16,6 +16,13 @@ export interface ReferenceQuery {
   limit?: number;
 }
 
+export interface TraceQuery {
+  symbol: string;
+  file?: string;
+  depth?: number;
+  limit?: number;
+}
+
 export type NavigationIntent = 'discover' | 'define' | 'inspect' | 'trace' | 'impact' | 'debug' | 'explain';
 export type NavigationMode = 'auto' | 'inspect' | 'trace' | 'impact' | 'debug' | 'explain';
 export type PlannerStatus = 'needs-discovery' | 'grounded-next-hop' | 'needs-narrowing' | 'answer-now';
@@ -113,6 +120,10 @@ export interface ReferenceFileGroup {
   };
   impactScore?: number;
   impactReason?: string;
+  callsInContext?: string[];
+  importsInFile?: string[];
+  isExported?: boolean;
+  functionRole?: string;
 }
 
 export interface ReferenceResult {
@@ -164,12 +175,62 @@ export interface RankedItem {
   file?: string;
 }
 
+export interface TraceCaller {
+  file: string;
+  line: number;
+  preview?: string;
+  callsInContext: string[];
+  importsFrom: string[];
+}
+
+export interface SessionRelationship {
+  fromSymbol: string;
+  fromFile: string;
+  toSymbol: string;
+  toFile: string;
+  relationType: 'calls' | 'imports' | 'extends' | 'uses';
+}
+
+export interface TraceResult {
+  root: { symbol: string; file?: string; line?: number };
+  callers: TraceCaller[];
+  depth: number;
+  totalCallers: number;
+  content: string;
+  details: Record<string, unknown>;
+}
+
+export interface CompareQuery {
+  symbol?: string;
+  pattern?: string;
+  scope?: string;
+  limit?: number;
+}
+
+export interface CompareImplementation {
+  symbol: string;
+  file: string;
+  line: number;
+  snippet?: string;
+  calls: string[];
+  functionRole?: string;
+}
+
+export interface CompareResult {
+  implementations: CompareImplementation[];
+  commonPattern: { calls: string[]; role: string };
+  outliers: Array<{ file: string; reason: string }>;
+  content: string;
+  details: Record<string, unknown>;
+}
+
 export interface PlannerQuery {
   task: string;
   symbol?: string;
   file?: string;
   mode?: NavigationMode;
   limit?: number;
+  depth?: number;
 }
 
 export interface ToolRoute {
@@ -215,6 +276,7 @@ export interface EvidenceSnapshot {
     route: ToolRouteFamily;
     nextTool?: string;
   };
+  symbolRelationships?: SessionRelationship[];
 }
 
 export interface NavigationPlan {

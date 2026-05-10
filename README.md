@@ -90,7 +90,20 @@ Find the exact definition location of a grounded symbol.
 Find usages of a grounded symbol, grouped by file, caller file prioritized.
 - Input: `symbol` (required), `file`, `limit`.
 - Best when the subtask is caller tracing, usage tracing, or impact.
-- Returns: grouped hits, top caller file, next-step hints.
+- Returns: grouped hits with enriched context (calls, imports, function role, export status), top caller file, next-step hints.
+
+### `code_nav_trace`
+Transitive call-chain exploration. Finds references, then extracts what each caller file invokes.
+- Input: `symbol` (required), `file`, `depth` (1-3), `limit` (3-20).
+- Best when debugging requires following chains: `auth.login()` -> `validateUser()` -> `checkPermissions()`.
+- Returns: root symbol, callers with calls-in-context and imports, follow-up hints for deeper tracing.
+- Depth > 1 recursively traces the strongest caller chain.
+
+### `code_nav_compare`
+Side-by-side implementation analysis. Finds similar function implementations across a scope.
+- Input: `symbol` or `pattern` (one required), `scope`, `limit` (2-15).
+- Best when comparing how a pattern is implemented across files (e.g., error handling, validation).
+- Returns: implementations with calls, common pattern, outliers that deviate from the norm.
 
 ### `code_nav_rank_context`
 Prioritize files and symbols already observed inside this Pi session.

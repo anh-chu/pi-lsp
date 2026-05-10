@@ -1,5 +1,5 @@
 import { formatCompactSection } from './format.ts';
-import { groupReferenceHits, formatReferenceGroups } from './reference-format.ts';
+import { enrichReferenceGroup, groupReferenceHits, formatReferenceGroups } from './reference-format.ts';
 import {
   findAstCandidates,
   findLspCandidates,
@@ -8,6 +8,7 @@ import {
   rememberMentionedFile,
   rememberQueriedSymbol,
   rememberReadFile,
+  recordSymbolRelationship,
   setLastResolvedDefinition,
   setLastTopCallerFiles,
 } from './state.ts';
@@ -152,6 +153,9 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
   const hits = resolution.hits;
   for (const hit of hits) rememberReadFile(hit.file);
   const groupedHits = groupReferenceHits(hits, resolution.backend, resolution.fallback, resolution.confidence);
+  for (const group of groupedHits) {
+    enrichReferenceGroup(group, symbol);
+  }
   const ok = hits.length > 0;
   const status: ReferenceResult['details']['status'] = ok ? 'resolved' : 'not-found';
   const bestNextCaller = groupedHits[0];
@@ -163,6 +167,18 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
     })),
   );
   const owningFile = bestNextCaller?.file ?? params.file;
+
+  for (const group of groupedHits) {
+    if (owningFile) {
+      recordSymbolRelationship({
+        fromSymbol: symbol,
+        fromFile: owningFile,
+        toSymbol: symbol,
+        toFile: group.file,
+        relationType: 'uses',
+      });
+    }
+  }
   const nextBestTool = ok ? 'code_nav_get_symbol' : 'code_nav_find_definition';
   const nextBestArgs = ok
     ? { symbol, file: owningFile, includeBody: false }

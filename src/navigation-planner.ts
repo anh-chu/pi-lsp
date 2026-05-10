@@ -148,13 +148,18 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
   } else if (intentResult.intent === 'trace' || intentResult.intent === 'impact') {
     const hasCallerEvidence = evidence.lastTopCallerFiles.length > 0 && evidence.queriedSymbols.includes(evidence.symbol);
     if (hasCallerEvidence) {
-      status = 'answer-now';
       bestRoute = {
-        primary: 'answer',
-        reason: 'Top caller evidence already exists in session state.',
-        ladderPosition: ladderForFamily('answer'),
+        primary: 'code_nav',
+        toolName: 'code_nav_trace',
+        args: { symbol: evidence.symbol, file: evidence.file, depth: query.depth ?? 1, limit },
+        reason: 'Caller evidence exists. Trace the transitive call chain to find deeper callers.',
+        ladderPosition: ladderForFamily('code_nav'),
       };
-      stopWhen.push(`Answer with strongest caller file first: ${evidence.lastTopCallerFiles[0]?.file ?? 'unknown'}.`);
+      steps.push(step(1, 'code_nav', 'code_nav_trace', bestRoute.reason, bestRoute.args, false));
+      fallbackSteps.push(step(1, 'read', 'read', 'If trace chain is shallow, read the strongest caller file for full context.', evidence.lastTopCallerFiles[0] ? { path: evidence.lastTopCallerFiles[0].file } : undefined, true));
+      stopWhen.push('Continue tracing into callers if the root cause is not yet identified.',
+        'Use code_nav_trace for transitive follow-up on strong caller files.',
+        'Stop when the call chain no longer leads toward the bug or feature under investigation.');
     } else {
       bestRoute = {
         primary: 'code_nav',
@@ -164,8 +169,11 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
         ladderPosition: ladderForFamily('code_nav'),
       };
       steps.push(step(1, 'code_nav', 'code_nav_find_references', bestRoute.reason, bestRoute.args, true));
+      steps.push(step(2, 'code_nav', 'code_nav_trace', 'After references resolve, trace the transitive call chain from the strongest caller.', { symbol: evidence.symbol, file: evidence.file, depth: 1, limit }, false));
       fallbackSteps.push(step(1, 'read', 'read', 'If refs return strong caller file, read only that caller next.', evidence.lastTopCallerFiles[0] ? { path: evidence.lastTopCallerFiles[0].file } : undefined, true));
-      stopWhen.push('Stop if grouped hits already answer simple usage question.', 'Inspect only best caller file before expanding to rest of impact list.');
+      stopWhen.push('Continue tracing into callers if the root cause is not yet identified.',
+        'Use code_nav_trace for transitive follow-up on strong caller files.',
+        'Stop only when grouped hits plus one caller hop answer the question.');
     }
   } else if (intentResult.intent === 'inspect') {
     bestRoute = {
@@ -182,14 +190,17 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
     if (evidence.symbol) {
       bestRoute = {
         primary: 'code_nav',
-        toolName: 'code_nav_find_references',
-        args: { symbol: evidence.symbol, file: evidence.file, limit },
-        reason: 'Cross-subsystem bug with grounded symbol. Trace callers across boundaries instead of reading all subsystems.',
+        toolName: 'code_nav_trace',
+        args: { symbol: evidence.symbol, file: evidence.file, depth: 1, limit },
+        reason: 'Cross-subsystem bug with grounded symbol. Trace transitive callers across boundaries instead of reading all subsystems.',
         ladderPosition: ladderForFamily('code_nav'),
       };
-      steps.push(step(1, 'code_nav', 'code_nav_find_references', bestRoute.reason, bestRoute.args, true));
+      steps.push(step(1, 'code_nav', 'code_nav_trace', bestRoute.reason, bestRoute.args, false));
+      steps.push(step(2, 'code_nav', 'code_nav_find_references', 'If trace reveals a boundary caller, find its references to map the full subsystem bridge.', { symbol: '<follow-up-symbol>', limit }, true));
       fallbackSteps.push(step(1, 'discovery', 'read', 'If references are sparse, orient on one subsystem\'s key docs to find entry points.', { path: 'README.md' }, true));
-      stopWhen.push('Stop once boundary calls between subsystems are identified.', 'Do not wiki-read every subsystem simultaneously.');
+      stopWhen.push('Continue tracing until boundary calls between subsystems are identified.',
+        'Stop when the root cause is found or the chain no longer crosses subsystem boundaries.',
+        'Do not wiki-read every subsystem simultaneously.');
     } else {
       status = 'needs-discovery';
       bestRoute = {
@@ -204,6 +215,33 @@ export function planNavigation(query: PlannerQuery): NavigationPlan {
       fallbackSteps.push(step(1, 'discovery', 'read', 'Pick one likely subsystem and read its key docs for orientation.', { path: 'README.md' }, true));
       stopWhen.push('Orient on one subsystem, then trace symbols across boundaries.', 'Do not read all subsystem docs simultaneously.');
     }
+  } else if (intentResult.intent === 'debug' && evidence.symbol) {
+    bestRoute = {
+      primary: 'code_nav',
+      toolName: 'code_nav_trace',
+      args: { symbol: evidence.symbol, file: evidence.file, depth: query.depth ?? 1, limit },
+      reason: 'Debug task with grounded symbol. Trace the call chain to find the root cause.',
+      ladderPosition: ladderForFamily('code_nav'),
+    };
+    steps.push(step(1, 'code_nav', 'code_nav_trace', bestRoute.reason, bestRoute.args, false));
+    fallbackSteps.push(step(1, 'read', 'read', 'If trace chain is shallow, read the strongest caller file for full context.', evidence.lastTopCallerFiles[0] ? { path: evidence.lastTopCallerFiles[0].file } : undefined, true));
+    stopWhen.push('Continue tracing into callers if the root cause is not yet identified.',
+      'Use code_nav_trace for transitive follow-up on strong caller files.',
+      'Stop when the call chain no longer leads toward the bug under investigation.');
+  } else if (intentResult.intent === 'debug') {
+    status = 'needs-discovery';
+    bestRoute = {
+      primary: 'discovery',
+      toolName: 'find',
+      args: { pattern: '*' },
+      reason: 'Debug task without grounded symbol. Discover the repo structure first, then trace.',
+      ladderPosition: ladderForFamily('discovery'),
+    };
+    steps.push(step(1, 'discovery', 'find', bestRoute.reason, { pattern: '*' }, true));
+    steps.push(step(2, 'code_nav', 'code_nav_trace', 'Once a suspect symbol is grounded, trace its call chain.', { symbol: '<grounded-symbol>', depth: 1, limit }, false));
+    fallbackSteps.push(step(1, 'discovery', 'read', 'Read likely entry point files for orientation.', { path: 'README.md' }, true));
+    stopWhen.push('Ground one suspect symbol, then trace its call chain.',
+      'Do not read every file in the repo; trace from one entry point.');
   } else {
     bestRoute = evidence.file
       ? {

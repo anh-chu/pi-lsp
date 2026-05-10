@@ -30,13 +30,16 @@ Preference order for code exploration. Do not skip steps unless the answer is al
 Before taking a step, match the situation to the tool:
 
 - **Before debugging a bug:** `code_nav_find_references` on the suspect function to trace callers and usage context.
+- **When debugging requires following a call chain:** `code_nav_trace` instead of manually chaining `code_nav_find_references` calls.
 - **Before changing a file:** use discovery tools to understand downstream impact.
+- **When comparing patterns across files:** `code_nav_compare` for side-by-side implementation analysis.
 - **When you hit a multi-step trace:** `code_nav_plan_navigation` to avoid wandering across random files.
-- **When a bug touches multiple subsystems:** orient on ONE subsystem with discovery tools first, then `code_nav_find_references` across boundaries. Do not explore all subsystems at once.
+- **When a bug touches multiple subsystems:** orient on ONE subsystem with discovery tools first, then `code_nav_trace` across boundaries. Do not explore all subsystems at once.
 - **When the symbol name is still uncertain:** discovery tools or `read` first. Never guess variants.
 - **When you need the full function body:** `code_nav_get_symbol` with `includeBody: true`.
 - **When you only need the file and line:** `code_nav_find_definition` instead of broad reads.
 - **When callers or impact are unknown:** `code_nav_find_references` grouped by caller file.
+- **When looking for outliers or deviations:** `code_nav_compare` to find implementations that break the common pattern.
 - **When ranking already-seen context:** `code_nav_rank_context` only after concrete session evidence exists.
 
 ## Wiki articles

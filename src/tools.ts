@@ -7,10 +7,14 @@ import { planNavigation } from './navigation-planner.ts';
 import { rankContext } from './ranking.ts';
 import { createPiToolInvoker, textToolResult } from './shared-tool-invoker.ts';
 import { findDefinition, findReferences, getSymbolSlice } from './symbols.ts';
-import type { DefinitionQuery, DefinitionResult, PlannerQuery, ReferenceQuery, ReferenceResult } from './types.ts';
+import { traceCallChain } from './trace.ts';
+import { compareImplementations } from './compare.ts';
+import type { CompareQuery, CompareResult, DefinitionQuery, DefinitionResult, PlannerQuery, ReferenceQuery, ReferenceResult, TraceQuery, TraceResult } from './types.ts';
 
 const DEFINITION_CACHE_PREFIX = 'symbol:def';
 const REFERENCES_CACHE_PREFIX = 'symbol:refs';
+const TRACE_CACHE_PREFIX = 'symbol:trace';
+const COMPARE_CACHE_PREFIX = 'symbol:compare';
 const NAVIGATION_CACHE_PREFIX = 'nav:plan';
 
 async function buildDefinitionResult(params: DefinitionQuery, pi: any): Promise<DefinitionResult> {
@@ -40,6 +44,37 @@ async function buildReferenceResult(params: ReferenceQuery, pi: any): Promise<Re
 
   const result = await findReferences(params, { invokeTool: createPiToolInvoker(pi) });
   setCache(cacheKey, result, fileMtime);
+  return result;
+}
+
+async function buildTraceResult(params: TraceQuery, pi: any): Promise<TraceResult> {
+  const cacheKey = buildCacheKey(TRACE_CACHE_PREFIX, {
+    symbol: params.symbol.trim(),
+    file: params.file,
+    depth: params.depth ?? 1,
+    limit: params.limit ?? 8,
+  });
+  const fileMtime = params.file ? getFileMtimeMs(params.file) : undefined;
+  const cached = readFreshCache<TraceResult>(cacheKey, fileMtime);
+  if (cached) return cached;
+
+  const result = await traceCallChain(params, { invokeTool: createPiToolInvoker(pi) });
+  setCache(cacheKey, result, fileMtime);
+  return result;
+}
+
+async function buildCompareResult(params: CompareQuery, pi: any): Promise<CompareResult> {
+  const cacheKey = buildCacheKey(COMPARE_CACHE_PREFIX, {
+    symbol: params.symbol,
+    pattern: params.pattern,
+    scope: params.scope,
+    limit: params.limit ?? 8,
+  });
+  const cached = readFreshCache<CompareResult>(cacheKey);
+  if (cached) return cached;
+
+  const result = await compareImplementations(params, { invokeTool: createPiToolInvoker(pi) });
+  setCache(cacheKey, result);
   return result;
 }
 
@@ -137,6 +172,63 @@ export function registerPiLspTools(pi: any) {
     },
     execute: async (_toolCallId: string, params: ReferenceQuery) => {
       const result = await buildReferenceResult(params, pi);
+      return textToolResult(result.content, result.details);
+    },
+  });
+
+  pi.registerTool({
+    name: 'code_nav_trace',
+    label: 'Pi LSP Trace',
+    description: 'Transitive call-chain exploration: find references to a symbol, then extract what each caller file invokes',
+    promptSnippet: 'Trace transitive call chains from a grounded symbol',
+    promptGuidelines: [
+      'Ladder position: 2 (function-level tracing). Use only after exact symbol name is grounded.',
+      'Use code_nav_trace when debugging requires following call chains: auth.login() -> validateUser() -> checkPermissions().',
+      'code_nav_trace finds references, then for each top caller file, extracts what other symbols that call-site invokes.',
+      'Trigger: when you hit a multi-step trace and need to follow a call chain, use code_nav_trace instead of manually chaining code_nav_find_references.',
+      'For depth > 1, the tool recursively traces the strongest caller chain. Keep depth <= 2 to avoid explosion.',
+      'If the root cause is already identified from one hop, stop and answer instead of tracing deeper.',
+    ],
+    parameters: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'Symbol to trace from' },
+        file: { type: 'string', description: 'Optional file hint for the symbol definition' },
+        depth: { type: 'number', description: 'Number of hops to trace (1-3, default 1)', minimum: 1, maximum: 3 },
+        limit: { type: 'number', description: 'Max callers per hop (3-20, default 8)', minimum: 3, maximum: 20 },
+      },
+      required: ['symbol'],
+    },
+    execute: async (_toolCallId: string, params: TraceQuery) => {
+      const result = await buildTraceResult(params, pi);
+      return textToolResult(result.content, result.details);
+    },
+  });
+
+  pi.registerTool({
+    name: 'code_nav_compare',
+    label: 'Pi LSP Compare',
+    description: 'Side-by-side implementation analysis: find similar function implementations across scope, detect common patterns and outliers',
+    promptSnippet: 'Compare similar implementations across files',
+    promptGuidelines: [
+      'Ladder position: 2 (function-level tracing). Use when comparing how a pattern is implemented across files.',
+      'Use code_nav_compare when you need to compare error handling, validation, or other patterns across multiple files.',
+      'Trigger: when you need to know "do all route handlers follow the same pattern?" use code_nav_compare.',
+      'Trigger: when looking for duplicated logic across files, use code_nav_compare.',
+      'The tool finds references to a symbol, extracts calls from each implementation, and identifies common patterns and outliers.',
+      'Outliers are implementations that deviate from the common pattern; inspect those first for bugs or intentional differences.',
+    ],
+    parameters: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'Symbol name to find similar implementations of' },
+        pattern: { type: 'string', description: 'Optional pattern to search for instead of symbol' },
+        scope: { type: 'string', description: 'Optional file/directory scope' },
+        limit: { type: 'number', description: 'Max implementations to compare (2-15, default 8)', minimum: 2, maximum: 15 },
+      },
+    },
+    execute: async (_toolCallId: string, params: CompareQuery) => {
+      const result = await buildCompareResult(params, pi);
       return textToolResult(result.content, result.details);
     },
   });

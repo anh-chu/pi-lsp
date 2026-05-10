@@ -5,6 +5,8 @@ export interface IntentResult {
   confidence: 'low' | 'medium' | 'high';
   rawLspOperation?: 'hover' | 'signatureHelp' | 'implementation' | 'incomingCalls' | 'outgoingCalls' | 'rename' | 'workspaceSymbol';
   crossSubsystem?: boolean;
+  phases?: Array<{ intent: NavigationIntent; reason: string }>;
+  estimatedHops?: number;
 }
 
 function hasAny(text: string, patterns: RegExp[]) {
@@ -64,7 +66,36 @@ export function classifyNavigationIntent(task: string, mode: NavigationMode = 'a
   }
 
   if (hasAny(text, [/debug/, /why/, /failing/, /broken/, /error/, /\bbug\b/, /\bfix\b/])) {
-    return { intent: 'debug', confidence: 'medium', crossSubsystem: isCrossSubsystem(text) };
+    const result: IntentResult = { intent: 'debug', confidence: 'medium', crossSubsystem: isCrossSubsystem(text) };
+
+    if (/\bfix\b/.test(text) || /\bbug\b/.test(text)) {
+      result.phases = [
+        { intent: 'discover', reason: 'Find the relevant subsystem or module' },
+        { intent: 'trace', reason: 'Follow the call chain to the root cause' },
+        { intent: 'inspect', reason: 'Read the failing code in detail' },
+      ];
+      result.estimatedHops = 3;
+    } else if (/debug|why|failing|broken|error/.test(text)) {
+      result.phases = [
+        { intent: 'discover', reason: 'Locate the error source' },
+        { intent: 'trace', reason: 'Trace the execution path' },
+      ];
+      result.estimatedHops = 2;
+    }
+
+    return result;
+  }
+
+  if (hasAny(text, [/\bimplement\b/, /\badd\b.*feature/, /\bbuild\b.*module/, /\bcreate\b.*handler/])) {
+    return {
+      intent: 'discover',
+      confidence: 'medium',
+      phases: [
+        { intent: 'discover', reason: 'Find the target module and existing patterns' },
+        { intent: 'inspect', reason: 'Read similar implementations for reference' },
+      ],
+      estimatedHops: 2,
+    };
   }
 
   if (hasAny(text, [/\brepo\b/, /subsystem/, /\broute\b/, /schema/, /\benv\b/])) {

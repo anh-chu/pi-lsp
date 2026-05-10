@@ -2,6 +2,10 @@ import { formatCompactSection } from './format.ts';
 import type { NavigationPlan } from './types.ts';
 
 export function formatNavigationPlan(plan: NavigationPlan) {
+  const phases = plan.evidence.symbolRelationships?.length
+    ? [`- session relationships tracked: ${plan.evidence.symbolRelationships.length}`]
+    : [];
+
   return formatCompactSection(plan.status === 'answer-now' ? 'Navigation plan: answer now' : 'Navigation plan', [
     `- intent: ${plan.intent}`,
     `- status: ${plan.status}`,
@@ -13,6 +17,7 @@ export function formatNavigationPlan(plan: NavigationPlan) {
     `- grounded file: ${plan.evidence.file ?? 'none'}`,
     `- next tool: ${plan.nextTool ?? 'none'}`,
     `- next args: ${plan.nextArgs ? JSON.stringify(plan.nextArgs) : 'none'}`,
+    ...phases,
     ...plan.steps.map((entry) => `- step ${entry.order}: ${entry.tool} (ladder ${entry.ladderPosition ?? '-'}) — ${entry.reason}${entry.args ? ` — ${JSON.stringify(entry.args)}` : ''}`),
     ...plan.fallbackSteps.map((entry) => `- fallback ${entry.order}: ${entry.tool} (ladder ${entry.ladderPosition ?? '-'}) — ${entry.reason}${entry.args ? ` — ${JSON.stringify(entry.args)}` : ''}`),
     ...plan.stopWhen.map((line) => `- stop when: ${line}`),
