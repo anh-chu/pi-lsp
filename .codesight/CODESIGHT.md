@@ -4,7 +4,7 @@
 
 > 0 routes | 0 models | 0 components | 24 lib files | 5 env vars | 0 middleware | 0% test coverage
 > **Token savings:** this file is ~2,300 tokens. Without it, AI exploration would cost ~16,000 tokens. **Saves ~13,700 tokens per conversation.**
-> **Last scanned:** 2026-05-10 22:09 — re-run after significant changes
+> **Last scanned:** 2026-05-10 22:17 — re-run after significant changes
 
 ---
 
@@ -120,12 +120,12 @@
 - `src/symbol-backends.ts` — imported by **10** files
 - `src/format.ts` — imported by **7** files
 - `src/symbols.ts` — imported by **5** files
+- `src/workspace-path.ts` — imported by **4** files
 - `src/symbol-fallback.ts` — imported by **4** files
 - `test/helpers.ts` — imported by **4** files
 - `src/navigation-planner.ts` — imported by **3** files
 - `src/ranking.ts` — imported by **3** files
 - `src/shared-tool-invoker.ts` — imported by **3** files
-- `src/workspace-path.ts` — imported by **3** files
 - `src/code-context.ts` — imported by **3** files
 - `src/tools.ts` — imported by **3** files
 - `src/symbol-normalization.ts` — imported by **3** files
@@ -143,18 +143,18 @@
 - `src/symbol-backends.ts` ← `src/compare.ts`, `src/reference-format.ts`, `src/shared-tool-invoker.ts`, `src/symbol-fallback.ts`, `src/symbol-fallback.ts` +5 more
 - `src/format.ts` ← `src/commands.ts`, `src/compare.ts`, `src/plan-format.ts`, `src/symbol-selection.ts`, `src/symbols.ts` +2 more
 - `src/symbols.ts` ← `src/commands.ts`, `src/compare.ts`, `src/tools.ts`, `src/trace.ts`, `test/tools.test.ts`
+- `src/workspace-path.ts` ← `src/compare.ts`, `src/reference-format.ts`, `src/trace.ts`, `test/workspace-path.test.ts`
 - `src/symbol-fallback.ts` ← `src/symbol-backends.ts`, `src/symbol-backends.ts`, `src/symbol-backends.ts`, `src/symbol-reference-resolution.ts`
 - `test/helpers.ts` ← `test/harness.test.ts`, `test/index.test.ts`, `test/planner.test.ts`, `test/tools.test.ts`
 - `src/navigation-planner.ts` ← `src/commands.ts`, `src/tools.ts`, `test/planner.test.ts`
 - `src/ranking.ts` ← `src/commands.ts`, `src/tools.ts`, `test/ranking.test.ts`
-- `src/shared-tool-invoker.ts` ← `src/commands.ts`, `src/tools.ts`, `test/invoker.test.ts`
 
 ---
 
 # Test Coverage
 
 > **0%** of routes and models are covered by tests
-> 9 test files found
+> 10 test files found
 
 ---
 

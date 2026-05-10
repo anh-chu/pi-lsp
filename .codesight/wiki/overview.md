@@ -19,7 +19,7 @@ Changes to these files have the widest blast radius across the codebase:
 - `src/symbol-backends.ts` — imported by **10** files
 - `src/format.ts` — imported by **7** files
 - `src/symbols.ts` — imported by **5** files
-- `src/symbol-fallback.ts` — imported by **4** files
+- `src/workspace-path.ts` — imported by **4** files
 
 ## Required Environment Variables
 

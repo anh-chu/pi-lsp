@@ -204,3 +204,67 @@ test('compare tool fails gracefully with no symbol or pattern', async () => {
     assert.equal(result.details.ok, false);
   });
 });
+
+test('compare tool uses ast_grep when only pattern is given', async () => {
+  await withTempProject({
+    'src/handlers/user.ts': 'export function handleError(e: Error) { logError(e); }',
+    'src/handlers/order.ts': 'export function handleError(e: Error) { logError(e); }',
+  }, async () => {
+    const astGrepCalls: Array<Record<string, unknown>> = [];
+    const pi = {
+      ...fakePi(),
+      async invokeTool(toolName: string, params: Record<string, unknown>) {
+        if (toolName === 'ast_grep_search') {
+          astGrepCalls.push(params);
+          return {
+            matches: [
+              { file: `${process.cwd()}/src/handlers/user.ts`, line: 0, text: 'export function handleError' },
+              { file: `${process.cwd()}/src/handlers/order.ts`, line: 0, text: 'export function handleError' },
+            ],
+          };
+        }
+        const tool = this.tools.find((t: any) => t.name === toolName);
+        if (tool) return tool.execute('test-call', params);
+        return null;
+      },
+    };
+    registerPiLspTools(pi);
+    const tool = findTool(pi, 'code_nav_compare');
+    const result = await tool.execute('call-compare-3', { pattern: 'export function handleError' });
+    assert.match(result.content[0].text, /Compare result/);
+    assert.ok(astGrepCalls.length > 0, 'Expected ast_grep_search to be called');
+    assert.ok(result.details.implementations.length > 0, 'Expected implementations from pattern search');
+  });
+});
+
+test('findReferences uses definitionFile not owningFile for relationships', async () => {
+  await withTempProject({
+    'src/auth.ts': 'export function validateUser(user: string) { return true; }',
+    'src/api.ts': 'import { validateUser } from "./auth";\nexport function login(req: any) { return validateUser(req.body); }',
+    'src/admin.ts': 'import { validateUser } from "./auth";\nexport function adminLogin(req: any) { return validateUser(req.token); }',
+  }, async () => {
+    const pi = fakePi();
+    registerPiLspTools(pi);
+    const tool = findTool(pi, 'code_nav_find_references');
+    const result = await tool.execute('call-refs-1', { symbol: 'validateUser' });
+
+    // The definition file should be src/auth.ts, not src/api.ts (best caller)
+    assert.equal(typeof result.details.definitionFile, 'string');
+    assert.ok(result.details.definitionFile.endsWith('src/auth.ts'), `Expected definition in auth.ts, got ${result.details.definitionFile}`);
+  });
+});
+
+test('trace tool uses definitionFile for root, not best caller', async () => {
+  await withTempProject({
+    'src/auth.ts': 'export function validateUser(user: string) { return checkDb(user); }\nfunction checkDb(u: string) { return true; }',
+    'src/api.ts': 'import { validateUser } from "./auth";\nexport function login(req: any) { return validateUser(req.body); }',
+  }, async () => {
+    const pi = fakePi();
+    registerPiLspTools(pi);
+    const tool = findTool(pi, 'code_nav_trace');
+    const result = await tool.execute('call-trace-3', { symbol: 'validateUser' });
+
+    // Root should be auth.ts (definition), not api.ts (caller)
+    assert.ok(result.details.root.endsWith('src/auth.ts'), `Expected root in auth.ts, got ${result.details.root}`);
+  });
+});
