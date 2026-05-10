@@ -88,23 +88,10 @@ test('resolveWorkspaceFile rejects sibling-prefix path', () => {
 test('resolveWorkspaceFile rejects real symlink escape', () => {
   withTempDir((root) => {
     mkdirSync(join(root, 'src'), { recursive: true });
-    // Create a symlink inside workspace pointing outside
     const outsideDir = mkdtempSync(join(tmpdir(), 'outside-'));
     writeFileSync(join(outsideDir, 'secret.ts'), 'export {};', 'utf8');
-    try {
-      symlinkSync(outsideDir, join(root, 'src/outside-link'));
-      const result = resolveWorkspaceFile('src/outside-link/secret.ts');
-      // Note: resolveWorkspaceFile uses path resolution, not realpath.
-      // This test documents current behavior - if we need symlink protection,
-      // we'd need to add realpath-based validation.
-      // For now, the path stays inside after resolution so it may be accepted.
-      // This test exists to document the gap.
-      if (result !== null) {
-        // Path resolved inside workspace (symlink not followed)
-        assert.ok(result.includes('src/outside-link'));
-      }
-    } catch {
-      // Symlink creation may fail in some environments, skip
-    }
+    symlinkSync(outsideDir, join(root, 'src/outside-link'));
+    const result = resolveWorkspaceFile('src/outside-link/secret.ts');
+    assert.equal(result, null);
   });
 });

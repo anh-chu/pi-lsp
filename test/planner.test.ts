@@ -270,6 +270,7 @@ test('findReferences uses definitionFile not owningFile for relationships', asyn
     // Verify relationships use definition file
     const rels = getSymbolRelationships();
     const usesRels = rels.filter((r) => r.relationType === 'uses' && r.fromSymbol === 'validateUser');
+    assert.ok(usesRels.length > 0, 'Expected uses relationships to be recorded');
     for (const rel of usesRels) {
       assert.equal(rel.fromFile, join(root, 'src/auth.ts'), `Relationship fromFile should be auth.ts, got ${rel.fromFile}`);
     }
