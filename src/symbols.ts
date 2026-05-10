@@ -167,12 +167,14 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
     })),
   );
   const owningFile = bestNextCaller?.file ?? params.file;
+  const definitionFile = resolution.definitionFile;
 
   for (const group of groupedHits) {
-    if (owningFile) {
+    const sourceFile = definitionFile ?? owningFile;
+    if (sourceFile) {
       recordSymbolRelationship({
         fromSymbol: symbol,
-        fromFile: owningFile,
+        fromFile: sourceFile,
         toSymbol: symbol,
         toFile: group.file,
         relationType: 'uses',
@@ -253,6 +255,8 @@ export async function findReferences(params: ReferenceQuery, options: Resolution
       definitionBackend: resolution.definitionBackend,
       definitionConfidence: resolution.definitionConfidence,
       definitionFallback: resolution.definitionFallback,
+      definitionFile: resolution.definitionFile,
+      definitionLine: resolution.definitionLine,
       ok,
       owningFile,
       sufficientForSimpleLookup: ok,

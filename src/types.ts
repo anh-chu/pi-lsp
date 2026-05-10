@@ -143,6 +143,8 @@ export interface ReferenceResult {
     definitionBackend?: 'lsp' | 'ast' | 'fallback';
     definitionConfidence?: 'high' | 'medium' | 'low';
     definitionFallback?: boolean;
+    definitionFile?: string;
+    definitionLine?: number;
     ok?: boolean;
     owningFile?: string;
     nextBestTool?: string;
@@ -191,13 +193,24 @@ export interface SessionRelationship {
   relationType: 'calls' | 'imports' | 'extends' | 'uses';
 }
 
+export interface TraceDetails {
+  symbol: string;
+  root?: string;
+  depth: number;
+  callers: TraceCaller[];
+  totalCallers: number;
+  suggestedNextTool?: string;
+  suggestedNextArgs?: Record<string, unknown>;
+  suggestedNextReason?: string;
+}
+
 export interface TraceResult {
   root: { symbol: string; file?: string; line?: number };
   callers: TraceCaller[];
   depth: number;
   totalCallers: number;
   content: string;
-  details: Record<string, unknown>;
+  details: TraceDetails;
 }
 
 export interface CompareQuery {
@@ -216,12 +229,25 @@ export interface CompareImplementation {
   functionRole?: string;
 }
 
+export interface CompareDetails {
+  symbol?: string;
+  implementations: CompareImplementation[];
+  commonPattern: { calls: string[]; role: string };
+  outliers: Array<{ file: string; reason: string }>;
+  totalImplementations: number;
+  suggestedNextTool?: string;
+  suggestedNextArgs?: Record<string, unknown>;
+  suggestedNextReason?: string;
+  ok?: boolean;
+  reason?: string;
+}
+
 export interface CompareResult {
   implementations: CompareImplementation[];
   commonPattern: { calls: string[]; role: string };
   outliers: Array<{ file: string; reason: string }>;
   content: string;
-  details: Record<string, unknown>;
+  details: CompareDetails;
 }
 
 export interface PlannerQuery {

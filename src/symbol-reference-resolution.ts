@@ -12,6 +12,8 @@ export interface ReferenceResolution {
   definitionBackend?: BackendName;
   definitionConfidence?: 'high' | 'medium' | 'low';
   definitionFallback?: boolean;
+  definitionFile?: string;
+  definitionLine?: number;
 }
 
 export interface DefinitionLocationResolver {
@@ -56,6 +58,8 @@ export async function resolveReferences(
       definitionBackend,
       definitionConfidence,
       definitionFallback,
+      definitionFile: definitionLocation?.file,
+      definitionLine: definitionLocation?.line,
     };
   }
 
@@ -73,5 +77,7 @@ export async function resolveReferences(
     definitionBackend,
     definitionConfidence,
     definitionFallback,
+    definitionFile: definitionLocation?.file,
+    definitionLine: definitionLocation?.line,
   };
 }

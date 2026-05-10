@@ -117,7 +117,7 @@ export async function traceCallChain(params: TraceQuery, options: TraceOptions =
 
       recordSymbolRelationship({
         fromSymbol: params.symbol,
-        fromFile: refResult.details.owningFile as string ?? params.file ?? '',
+        fromFile: refResult.details.definitionFile as string ?? params.file ?? '',
         toSymbol: params.symbol,
         toFile: group.file,
         relationType: 'calls',
@@ -148,7 +148,7 @@ export async function traceCallChain(params: TraceQuery, options: TraceOptions =
   return {
     root: {
       symbol: params.symbol,
-      file: refResult.details.owningFile as string | undefined ?? params.file,
+      file: refResult.details.definitionFile as string | undefined ?? refResult.details.owningFile as string | undefined ?? params.file,
       line: refResult.details.groupedHits?.[0]?.topPreview?.line,
     },
     callers,
@@ -156,7 +156,7 @@ export async function traceCallChain(params: TraceQuery, options: TraceOptions =
     totalCallers: refResult.hits.length,
     content: formatCompactSection('Trace result', [
       `- symbol: ${params.symbol}`,
-      `- root file: ${refResult.details.owningFile ?? params.file ?? 'unknown'}`,
+      `- root file: ${refResult.details.definitionFile ?? refResult.details.owningFile ?? params.file ?? 'unknown'}`,
       `- depth: ${depth}`,
       `- callers found: ${callers.length}`,
       `- total references: ${refResult.hits.length}`,
@@ -174,7 +174,7 @@ export async function traceCallChain(params: TraceQuery, options: TraceOptions =
     ]),
     details: {
       symbol: params.symbol,
-      root: refResult.details.owningFile ?? params.file,
+      root: refResult.details.definitionFile ?? refResult.details.owningFile ?? params.file,
       depth,
       callers,
       totalCallers: refResult.hits.length,
