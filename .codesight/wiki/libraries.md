@@ -2,11 +2,15 @@
 
 > **Navigation aid.** Library inventory extracted via AST. Read the source files listed here before modifying exported functions.
 
-**22 library files** across 22 modules
+**24 library files** across 24 modules
 
 ## Cache.ts (1 files)
 
 - `src/cache.ts` — getCache, setCache, clearCache, invalidateCache, readFreshCache, getFileMtimeMs, …
+
+## Code-context.ts (1 files)
+
+- `src/code-context.ts` — inferFunctionRole, extractCallsFromPreview, extractImportsFromLines
 
 ## Commands.ts (1 files)
 
@@ -91,6 +95,10 @@
 ## Trace.ts (1 files)
 
 - `src/trace.ts` — traceCallChain
+
+## Workspace-path.ts (1 files)
+
+- `src/workspace-path.ts` — resolveWorkspaceFile
 
 ---
 _Back to [overview.md](./overview.md)_

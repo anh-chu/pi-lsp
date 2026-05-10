@@ -5,44 +5,11 @@ import { rememberReadFile, rememberQueriedSymbol, recordSymbolRelationship } fro
 import type { TraceCaller, TraceQuery, TraceResult } from './types.ts';
 import type { ToolInvoker } from './symbol-backends.ts';
 import type { ReferenceFileGroup } from './types.ts';
+import { resolveWorkspaceFile } from './workspace-path.ts';
+import { extractCallsFromPreview, extractImportsFromLines, inferFunctionRole } from './code-context.ts';
 
 interface TraceOptions {
   invokeTool?: ToolInvoker;
-}
-
-function extractCallsFromPreview(preview: string, symbol: string): string[] {
-  const calls: string[] = [];
-  const callPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
-  let match;
-  while ((match = callPattern.exec(preview)) !== null) {
-    const name = match[1]!;
-    if (name !== symbol && name !== 'if' && name !== 'for' && name !== 'while' && name !== 'switch' && name !== 'catch' && name !== 'return' && name !== 'await' && name !== 'new' && name !== 'typeof' && name !== 'import' && name !== 'require') {
-      calls.push(name);
-    }
-  }
-  return [...new Set(calls)];
-}
-
-function extractImportsFromLines(lines: string[]): string[] {
-  const imports: string[] = [];
-  for (const line of lines) {
-    const fromMatch = line.match(/from\s+['"]([^'"]+)['"]/);
-    if (fromMatch) imports.push(fromMatch[1]!);
-    const requireMatch = line.match(/require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
-    if (requireMatch) imports.push(requireMatch[1]!);
-  }
-  return [...new Set(imports)];
-}
-
-function inferFunctionRole(filePath: string): string {
-  const lower = filePath.toLowerCase();
-  if (lower.includes('/api/') || lower.includes('/routes/') || lower.includes('/handlers/')) return 'route handler';
-  if (lower.includes('/middleware/')) return 'middleware';
-  if (lower.includes('/test/') || lower.includes('.test.') || lower.includes('.spec.')) return 'test';
-  if (lower.includes('/utils/') || lower.includes('/helpers/')) return 'utility';
-  if (lower.includes('/services/')) return 'service';
-  if (lower.includes('/models/') || lower.includes('/entities/')) return 'model';
-  return 'unknown';
 }
 
 async function extractCallerContext(
@@ -78,9 +45,12 @@ async function extractCallerContext(
   }
 
   try {
-    const fileContent = readFileSync(file, 'utf8');
-    const lines = fileContent.split(/\r?\n/);
-    importsFrom = extractImportsFromLines(lines);
+    const safePath = resolveWorkspaceFile(file);
+    if (safePath) {
+      const fileContent = readFileSync(safePath, 'utf8');
+      const lines = fileContent.split(/\r?\n/);
+      importsFrom = extractImportsFromLines(lines);
+    }
   } catch {
     // file not readable
   }
@@ -192,12 +162,14 @@ export async function traceCallChain(params: TraceQuery, options: TraceOptions =
       `- total references: ${refResult.hits.length}`,
       ...callers.map((caller, i) => {
         const role = inferFunctionRole(caller.file);
-        const calls = caller.callsInContext.length > 0 ? ` → calls: ${caller.callsInContext.join(', ')}` : '';
+        const calls = caller.callsInContext.length > 0 ? ` -> calls: ${caller.callsInContext.join(', ')}` : '';
         const imports = caller.importsFrom.length > 0 ? ` (imports from: ${caller.importsFrom.slice(0, 3).join(', ')})` : '';
         return `- caller ${i + 1}: ${caller.file}:${caller.line} [${role}]${caller.preview ? ` — ${caller.preview}` : ''}${calls}${imports}`;
       }),
       ...callers.filter((c) => c.callsInContext.length > 0).slice(0, 3).map((caller) =>
-        `- follow-up: trace ${caller.callsInContext[0]} from ${caller.file} for deeper chain`
+        depth > 1
+          ? `- follow-up: trace ${caller.callsInContext[0]} from ${caller.file} for deeper chain (${depth - 1} hops remaining)`
+          : `- context: ${caller.callsInContext[0]} is called from ${caller.file}:${caller.line}`
       ),
     ]),
     details: {
@@ -206,14 +178,14 @@ export async function traceCallChain(params: TraceQuery, options: TraceOptions =
       depth,
       callers,
       totalCallers: refResult.hits.length,
-      suggestedNextTool: callers.length > 0 && callers[0].callsInContext.length > 0
+      suggestedNextTool: depth > 1 && callers.length > 0 && callers[0].callsInContext.length > 0
         ? 'code_nav_trace'
         : 'code_nav_get_symbol',
-      suggestedNextArgs: callers.length > 0 && callers[0].callsInContext.length > 0
+      suggestedNextArgs: depth > 1 && callers.length > 0 && callers[0].callsInContext.length > 0
         ? { symbol: callers[0].callsInContext[0], file: callers[0].file, depth: depth - 1 }
         : { symbol: params.symbol, file: callers[0]?.file ?? params.file, includeBody: true },
-      suggestedNextReason: callers.length > 0 && callers[0].callsInContext.length > 0
-        ? `First caller invokes ${callers[0].callsInContext[0]}; trace it for deeper chain.`
+      suggestedNextReason: depth > 1 && callers.length > 0 && callers[0].callsInContext.length > 0
+        ? `First caller invokes ${callers[0].callsInContext[0]}; trace it for deeper chain (${depth - 1} hops remaining).`
         : 'Read the caller body for full context.',
     },
   };

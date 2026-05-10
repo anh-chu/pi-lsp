@@ -186,7 +186,7 @@ export function registerPiLspTools(pi: any) {
       'Use code_nav_trace when debugging requires following call chains: auth.login() -> validateUser() -> checkPermissions().',
       'code_nav_trace finds references, then for each top caller file, extracts what other symbols that call-site invokes.',
       'Trigger: when you hit a multi-step trace and need to follow a call chain, use code_nav_trace instead of manually chaining code_nav_find_references.',
-      'For depth > 1, the tool recursively traces the strongest caller chain. Keep depth <= 2 to avoid explosion.',
+      'For depth > 1, the tool returns follow-up args with depth-1 for the agent to trace the next hop. Keep depth <= 2 to avoid explosion.',
       'If the root cause is already identified from one hop, stop and answer instead of tracing deeper.',
     ],
     parameters: {

@@ -156,6 +156,25 @@ test('trace tool registered and returns call chain', async () => {
     const result = await tool.execute('call-trace-1', { symbol: 'validateUser' });
     assert.match(result.content[0].text, /Trace result/);
     assert.equal(Array.isArray(result.details.callers), true);
+    assert.equal(typeof result.details.depth, 'number');
+    assert.equal(typeof result.details.totalCallers, 'number');
+  });
+});
+
+test('trace tool respects depth parameter', async () => {
+  await withTempProject({
+    'src/auth.ts': 'export function validateUser(user: string) { return checkDb(user); }',
+    'src/api.ts': 'import { validateUser } from "./auth";\nexport function login(req: any) { return validateUser(req.body); }',
+  }, async () => {
+    const pi = fakePi();
+    registerPiLspTools(pi);
+    const tool = findTool(pi, 'code_nav_trace');
+    const result = await tool.execute('call-trace-2', { symbol: 'validateUser', depth: 1 });
+    assert.equal(result.details.depth, 1);
+    // With depth 1, should suggest get_symbol for follow-up, not another trace
+    if (result.details.callers.length > 0 && result.details.callers[0].callsInContext.length > 0) {
+      assert.equal(result.details.suggestedNextTool, 'code_nav_get_symbol');
+    }
   });
 });
 
@@ -170,5 +189,18 @@ test('compare tool registered and returns implementations', async () => {
     const result = await tool.execute('call-compare-1', { symbol: 'handleError' });
     assert.match(result.content[0].text, /Compare result/);
     assert.equal(Array.isArray(result.details.implementations), true);
+    assert.equal(Array.isArray(result.details.commonPattern.calls), true);
+    assert.equal(Array.isArray(result.details.outliers), true);
+  });
+});
+
+test('compare tool fails gracefully with no symbol or pattern', async () => {
+  await withTempProject({}, async () => {
+    const pi = fakePi();
+    registerPiLspTools(pi);
+    const tool = findTool(pi, 'code_nav_compare');
+    const result = await tool.execute('call-compare-2', {});
+    assert.match(result.content[0].text, /Compare failed/);
+    assert.equal(result.details.ok, false);
   });
 });

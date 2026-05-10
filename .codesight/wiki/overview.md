@@ -6,9 +6,9 @@
 
 ## Scale
 
-22 library files · 5 environment variables
+24 library files · 5 environment variables
 
-**Libraries:** 22 files — see [libraries.md](./libraries.md)
+**Libraries:** 24 files — see [libraries.md](./libraries.md)
 
 ## High-Impact Files
 

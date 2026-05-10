@@ -2,9 +2,9 @@
 
 > **Stack:** raw-http | none | unknown | typescript
 
-> 0 routes | 0 models | 0 components | 22 lib files | 5 env vars | 0 middleware | 0% test coverage
-> **Token savings:** this file is ~2,200 tokens. Without it, AI exploration would cost ~15,500 tokens. **Saves ~13,300 tokens per conversation.**
-> **Last scanned:** 2026-05-10 21:52 — re-run after significant changes
+> 0 routes | 0 models | 0 components | 24 lib files | 5 env vars | 0 middleware | 0% test coverage
+> **Token savings:** this file is ~2,300 tokens. Without it, AI exploration would cost ~16,000 tokens. **Saves ~13,700 tokens per conversation.**
+> **Last scanned:** 2026-05-10 22:03 — re-run after significant changes
 
 ---
 
@@ -18,6 +18,10 @@
   - function readFreshCache: (key, mtimeMs?) => T | undefined
   - function getFileMtimeMs: (file) => number | undefined
   - _...2 more_
+- `src/code-context.ts`
+  - function inferFunctionRole: (filePath) => string
+  - function extractCallsFromPreview: (preview, symbol) => string[]
+  - function extractImportsFromLines: (lines) => string[]
 - `src/commands.ts` — function registerPiLspCommands: (pi) => void
 - `src/compare.ts` — function compareImplementations: (params, options) => Promise<CompareResult>
 - `src/format.ts`
@@ -87,6 +91,7 @@
   - function getSymbolSlice: (params, options) => Promise<SymbolResult>
 - `src/tools.ts` — function registerPiLspTools: (pi) => void
 - `src/trace.ts` — function traceCallChain: (params, options) => Promise<TraceResult>
+- `src/workspace-path.ts` — function resolveWorkspaceFile: (file) => string | null
 
 ---
 
@@ -120,6 +125,8 @@
 - `src/navigation-planner.ts` — imported by **3** files
 - `src/ranking.ts` — imported by **3** files
 - `src/shared-tool-invoker.ts` — imported by **3** files
+- `src/workspace-path.ts` — imported by **3** files
+- `src/code-context.ts` — imported by **3** files
 - `src/tools.ts` — imported by **3** files
 - `src/symbol-normalization.ts` — imported by **3** files
 - `src/plan-format.ts` — imported by **2** files
@@ -128,8 +135,6 @@
 - `src/sg-runner.ts` — imported by **2** files
 - `src/tools/shared.ts` — imported by **2** files
 - `src/cache.ts` — imported by **2** files
-- `src/navigation-evidence.ts` — imported by **1** files
-- `src/slices.ts` — imported by **1** files
 
 ## Import Map (who imports what)
 

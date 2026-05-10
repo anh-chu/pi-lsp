@@ -12,6 +12,8 @@
 - `src/navigation-planner.ts` — imported by **3** files
 - `src/ranking.ts` — imported by **3** files
 - `src/shared-tool-invoker.ts` — imported by **3** files
+- `src/workspace-path.ts` — imported by **3** files
+- `src/code-context.ts` — imported by **3** files
 - `src/tools.ts` — imported by **3** files
 - `src/symbol-normalization.ts` — imported by **3** files
 - `src/plan-format.ts` — imported by **2** files
@@ -20,8 +22,6 @@
 - `src/sg-runner.ts` — imported by **2** files
 - `src/tools/shared.ts` — imported by **2** files
 - `src/cache.ts` — imported by **2** files
-- `src/navigation-evidence.ts` — imported by **1** files
-- `src/slices.ts` — imported by **1** files
 
 ## Import Map (who imports what)
 

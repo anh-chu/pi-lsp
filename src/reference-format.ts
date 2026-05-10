@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import type { ReferenceFileGroup, ReferenceHit } from './types.ts';
 import type { BackendName, ToolInvoker } from './symbol-backends.ts';
 import { strongerConfidence } from './symbol-normalization.ts';
+import { resolveWorkspaceFile } from './workspace-path.ts';
+import { extractCallsFromPreview, extractImportsFromLines, inferFunctionRole } from './code-context.ts';
 
 function scoreReferencePreview(hit: ReferenceHit): { priority: number; reason: string } {
   const preview = hit.preview ?? '';
@@ -168,41 +170,6 @@ export function formatReferenceGroups(groups: ReferenceFileGroup[]): string[] {
   });
 }
 
-function inferFunctionRole(filePath: string): string {
-  const lower = filePath.toLowerCase();
-  if (lower.includes('/api/') || lower.includes('/routes/') || lower.includes('/handlers/')) return 'route handler';
-  if (lower.includes('/middleware/')) return 'middleware';
-  if (lower.includes('/test/') || lower.includes('.test.') || lower.includes('.spec.')) return 'test';
-  if (lower.includes('/utils/') || lower.includes('/helpers/')) return 'utility';
-  if (lower.includes('/services/')) return 'service';
-  if (lower.includes('/models/') || lower.includes('/entities/')) return 'model';
-  return 'unknown';
-}
-
-function extractImportsFromLines(lines: string[]): string[] {
-  const imports: string[] = [];
-  for (const line of lines) {
-    const fromMatch = line.match(/from\s+['"]([^'"]+)['"]\s*;?/);
-    if (fromMatch) imports.push(fromMatch[1]!);
-    const requireMatch = line.match(/require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
-    if (requireMatch) imports.push(requireMatch[1]!);
-  }
-  return [...new Set(imports)];
-}
-
-function extractCallsFromPreview(preview: string, symbol: string): string[] {
-  const calls: string[] = [];
-  const callPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
-  let match;
-  while ((match = callPattern.exec(preview)) !== null) {
-    const name = match[1]!;
-    if (name !== symbol && !['if', 'for', 'while', 'switch', 'catch', 'return', 'await', 'new', 'typeof', 'import', 'require', 'expect', 'describe', 'it', 'test', 'beforeEach', 'afterEach'].includes(name)) {
-      calls.push(name);
-    }
-  }
-  return [...new Set(calls)];
-}
-
 export function enrichReferenceGroup(
   group: ReferenceFileGroup,
   symbol: string,
@@ -220,9 +187,14 @@ export function enrichReferenceGroup(
   group.callsInContext = [...new Set(allCalls)].slice(0, 10);
 
   try {
-    const fileContent = readFileSync(group.file, 'utf8');
-    const fileLines = fileContent.split(/\r?\n/);
-    group.importsInFile = extractImportsFromLines(fileLines).slice(0, 10);
+    const safePath = resolveWorkspaceFile(group.file);
+    if (safePath) {
+      const fileContent = readFileSync(safePath, 'utf8');
+      const fileLines = fileContent.split(/\r?\n/);
+      group.importsInFile = extractImportsFromLines(fileLines).slice(0, 10);
+    } else {
+      group.importsInFile = [];
+    }
   } catch {
     group.importsInFile = [];
   }

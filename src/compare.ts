@@ -5,38 +5,18 @@ import { rememberReadFile, rememberQueriedSymbol } from './state.ts';
 import type { CompareImplementation, CompareQuery, CompareResult } from './types.ts';
 import type { ToolInvoker } from './symbol-backends.ts';
 import type { ReferenceFileGroup } from './types.ts';
+import { resolveWorkspaceFile } from './workspace-path.ts';
+import { extractCallsFromPreview, inferFunctionRole } from './code-context.ts';
 
 interface CompareOptions {
   invokeTool?: ToolInvoker;
 }
 
-function inferFunctionRole(filePath: string): string {
-  const lower = filePath.toLowerCase();
-  if (lower.includes('/api/') || lower.includes('/routes/') || lower.includes('/handlers/')) return 'route handler';
-  if (lower.includes('/middleware/')) return 'middleware';
-  if (lower.includes('/test/') || lower.includes('.test.') || lower.includes('.spec.')) return 'test';
-  if (lower.includes('/utils/') || lower.includes('/helpers/')) return 'utility';
-  if (lower.includes('/services/')) return 'service';
-  if (lower.includes('/models/') || lower.includes('/entities/')) return 'model';
-  return 'unknown';
-}
-
-function extractCallsFromPreview(preview: string, symbol: string): string[] {
-  const calls: string[] = [];
-  const callPattern = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
-  let match;
-  while ((match = callPattern.exec(preview)) !== null) {
-    const name = match[1]!;
-    if (name !== symbol && !['if', 'for', 'while', 'switch', 'catch', 'return', 'await', 'new', 'typeof', 'import', 'require', 'expect', 'describe', 'it', 'test'].includes(name)) {
-      calls.push(name);
-    }
-  }
-  return [...new Set(calls)];
-}
-
 function extractSnippet(filePath: string, line: number, contextLines: number = 5): string {
   try {
-    const content = readFileSync(filePath, 'utf8');
+    const safePath = resolveWorkspaceFile(filePath);
+    if (!safePath) return '';
+    const content = readFileSync(safePath, 'utf8');
     const lines = content.split(/\r?\n/);
     const start = Math.max(0, line - 1 - contextLines);
     const end = Math.min(lines.length, line - 1 + contextLines + 1);
@@ -96,10 +76,28 @@ export async function compareImplementations(params: CompareQuery, options: Comp
     };
   }
 
-  let filesToInspect: Array<{ file: string; line: number; preview?: string }> = [];
+  let filesToInspect: Array<{ file: string; line: number; preview?: string; isDeclaration?: boolean }> = [];
 
   if (params.symbol) {
     rememberQueriedSymbol(params.symbol);
+
+    // First, find the actual definition(s) of the symbol
+    const symbolResult = await getSymbolSlice(
+      { symbol: params.symbol, file: params.scope, includeBody: true, contextLines: 0 },
+      { invokeTool: options.invokeTool },
+    );
+
+    if (symbolResult.location?.file) {
+      filesToInspect.push({
+        file: symbolResult.location.file,
+        line: symbolResult.location.line,
+        preview: symbolResult.content.slice(0, 200),
+        isDeclaration: true,
+      });
+      rememberReadFile(symbolResult.location.file);
+    }
+
+    // Then find references to see where it's used
     const refResult = await findReferences(
       { symbol: params.symbol, file: params.scope, limit },
       { invokeTool: options.invokeTool },
@@ -107,14 +105,40 @@ export async function compareImplementations(params: CompareQuery, options: Comp
     const groupedHits = refResult.details.groupedHits as ReferenceFileGroup[] | undefined;
     if (groupedHits) {
       for (const group of groupedHits) {
-        for (const lineInfo of group.lines.slice(0, 2)) {
+        for (const lineInfo of group.lines.slice(0, 1)) {
+          // Skip if this is the declaration file (already added)
+          if (symbolResult.location?.file && group.file === symbolResult.location.file) continue;
           filesToInspect.push({
             file: group.file,
             line: lineInfo.line,
             preview: lineInfo.preview,
+            isDeclaration: false,
           });
           rememberReadFile(group.file);
         }
+      }
+    }
+  } else if (params.pattern && options.invokeTool) {
+    // Use ast-grep to find pattern matches
+    const scope = params.scope || process.cwd();
+    const response = await options.invokeTool('ast_grep_search', {
+      pattern: params.pattern,
+      lang: 'typescript',
+      paths: [scope],
+    });
+
+    const matches = Array.isArray(response?.matches) ? response.matches : [];
+    for (const match of matches.slice(0, limit)) {
+      const file = match?.file ?? match?.path ?? match?.uri;
+      const line = match?.line ?? match?.range?.start?.line ?? match?.start?.line;
+      if (file && typeof line === 'number') {
+        filesToInspect.push({
+          file,
+          line: line + 1,
+          preview: match?.text ?? match?.match ?? '',
+          isDeclaration: true,
+        });
+        rememberReadFile(file);
       }
     }
   }
@@ -136,9 +160,11 @@ export async function compareImplementations(params: CompareQuery, options: Comp
   const commonCalls = findCommonCalls(implementations);
   const outliers = findOutliers(implementations, commonCalls);
   const roles = implementations.map((impl) => impl.functionRole ?? 'unknown');
-  const mostCommonRole = roles.sort((a, b) =>
-    roles.filter((r) => r === b).length - roles.filter((r) => r === a).length
-  )[0] ?? 'unknown';
+  const roleCounts = new Map<string, number>();
+  for (const role of roles) {
+    roleCounts.set(role, (roleCounts.get(role) ?? 0) + 1);
+  }
+  const mostCommonRole = [...roleCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'unknown';
 
   return {
     implementations,
@@ -152,7 +178,7 @@ export async function compareImplementations(params: CompareQuery, options: Comp
       `- common role: ${mostCommonRole}`,
       `- outliers: ${outliers.length}`,
       ...implementations.slice(0, 8).map((impl, i) => {
-        const calls = impl.calls.length > 0 ? ` → calls: ${impl.calls.slice(0, 5).join(', ')}` : '';
+        const calls = impl.calls.length > 0 ? ` -> calls: ${impl.calls.slice(0, 5).join(', ')}` : '';
         return `- impl ${i + 1}: ${impl.file}:${impl.line} [${impl.functionRole}]${calls}`;
       }),
       ...outliers.slice(0, 3).map((outlier) => `- outlier: ${outlier.file} — ${outlier.reason}`),

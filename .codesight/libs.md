@@ -8,6 +8,10 @@
   - function readFreshCache: (key, mtimeMs?) => T | undefined
   - function getFileMtimeMs: (file) => number | undefined
   - _...2 more_
+- `src/code-context.ts`
+  - function inferFunctionRole: (filePath) => string
+  - function extractCallsFromPreview: (preview, symbol) => string[]
+  - function extractImportsFromLines: (lines) => string[]
 - `src/commands.ts` — function registerPiLspCommands: (pi) => void
 - `src/compare.ts` — function compareImplementations: (params, options) => Promise<CompareResult>
 - `src/format.ts`
@@ -77,3 +81,4 @@
   - function getSymbolSlice: (params, options) => Promise<SymbolResult>
 - `src/tools.ts` — function registerPiLspTools: (pi) => void
 - `src/trace.ts` — function traceCallChain: (params, options) => Promise<TraceResult>
+- `src/workspace-path.ts` — function resolveWorkspaceFile: (file) => string | null
