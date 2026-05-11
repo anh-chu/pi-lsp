@@ -30,4 +30,4 @@ Changes to these files have the widest blast radius across the codebase:
 - `PI_OFFLINE` — `benchmarks/automation/run-live-benchmarks.mjs`
 
 ---
-_Back to [index.md](./index.md) · Generated 2026-05-10_
+_Back to [index.md](./index.md) · Generated 2026-05-11_
