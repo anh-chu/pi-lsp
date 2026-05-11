@@ -95,3 +95,14 @@ test('resolveWorkspaceFile rejects real symlink escape', () => {
     assert.equal(result, null);
   });
 });
+
+test('resolveWorkspaceFile rejects missing file under external symlink', () => {
+  withTempDir((root) => {
+    mkdirSync(join(root, 'src'), { recursive: true });
+    const outsideDir = mkdtempSync(join(tmpdir(), 'outside-'));
+    symlinkSync(outsideDir, join(root, 'src/outside-link'));
+    // File doesn't exist, but the symlink points outside
+    const result = resolveWorkspaceFile('src/outside-link/missing.ts');
+    assert.equal(result, null);
+  });
+});

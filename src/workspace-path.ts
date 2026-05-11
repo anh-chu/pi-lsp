@@ -1,4 +1,4 @@
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { isAbsolute, relative, resolve, sep, dirname } from 'node:path';
 import { realpathSync } from 'node:fs';
 
 /**
@@ -19,7 +19,17 @@ export function resolveWorkspaceFile(file: string): string | null {
     if (realRel === '..' || realRel.startsWith(`..${sep}`) || isAbsolute(realRel)) return null;
     return real;
   } catch {
-    // File doesn't exist yet - that's fine, the path itself is safe
-    return abs;
+    // File doesn't exist. Check if the parent directory is inside the workspace.
+    // This catches cases like src/outside-link/missing.ts where outside-link
+    // is a symlink to an external directory.
+    try {
+      const parentDir = dirname(abs);
+      const parentReal = realpathSync(parentDir);
+      const parentRel = relative(root, parentReal);
+      if (parentRel === '..' || parentRel.startsWith(`..${sep}`) || isAbsolute(parentRel)) return null;
+      return abs;
+    } catch {
+      return null;
+    }
   }
 }
