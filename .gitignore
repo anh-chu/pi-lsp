@@ -33,7 +33,6 @@ tmp/
 
 # local agent/tool artifacts
 .pi-lens/
-.codesight/
 
 # package manager cache if created locally
 .npm/

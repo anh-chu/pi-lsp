@@ -1,4 +1,4 @@
-import type { NavigationIntent, RankedItem, ToolRouteFamily } from './types.ts';
+import type { NavigationIntent, RankedItem, SessionRelationship, ToolRouteFamily } from './types.ts';
 
 export interface PiLspSessionState {
   mentionedFiles: string[];
@@ -21,6 +21,7 @@ export interface PiLspSessionState {
     route: ToolRouteFamily;
     nextTool?: string;
   };
+  symbolRelationships: SessionRelationship[];
 }
 
 const state: PiLspSessionState = {
@@ -29,6 +30,7 @@ const state: PiLspSessionState = {
   queriedSymbols: [],
   lastRankedItems: [],
   lastTopCallerFiles: [],
+  symbolRelationships: [],
 };
 
 export function getState() {
@@ -63,6 +65,21 @@ export function setLastPlannerResult(result: PiLspSessionState['lastPlannerResul
   state.lastPlannerResult = result;
 }
 
+export function recordSymbolRelationship(relationship: SessionRelationship) {
+  const exists = state.symbolRelationships.some(
+    (r) => r.fromSymbol === relationship.fromSymbol &&
+           r.toSymbol === relationship.toSymbol &&
+           r.fromFile === relationship.fromFile &&
+           r.toFile === relationship.toFile &&
+           r.relationType === relationship.relationType,
+  );
+  if (!exists) state.symbolRelationships.push(relationship);
+}
+
+export function getSymbolRelationships(): SessionRelationship[] {
+  return [...state.symbolRelationships];
+}
+
 export function resetState() {
   state.mentionedFiles = [];
   state.readFiles = [];
@@ -71,4 +88,5 @@ export function resetState() {
   state.lastResolvedDefinition = undefined;
   state.lastTopCallerFiles = [];
   state.lastPlannerResult = undefined;
+  state.symbolRelationships = [];
 }

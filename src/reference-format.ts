@@ -1,7 +1,10 @@
 import { basename } from 'node:path';
+import { readFileSync } from 'node:fs';
 import type { ReferenceFileGroup, ReferenceHit } from './types.ts';
-import type { BackendName } from './symbol-backends.ts';
+import type { BackendName, ToolInvoker } from './symbol-backends.ts';
 import { strongerConfidence } from './symbol-normalization.ts';
+import { resolveWorkspaceFile } from './workspace-path.ts';
+import { extractCallsFromPreview, extractImportsFromLines, inferFunctionRole } from './code-context.ts';
 
 function scoreReferencePreview(hit: ReferenceHit): { priority: number; reason: string } {
   const preview = hit.preview ?? '';
@@ -153,12 +156,46 @@ export function formatReferenceGroups(groups: ReferenceFileGroup[]): string[] {
   return groups.slice(0, 8).flatMap((group, index) => {
     const header = `- ${index === 0 ? 'best next caller' : 'impact file'}: ${group.file} (${group.count} hit${group.count === 1 ? '' : 's'}, impact=${group.impactScore ?? 0}, backend=${group.backend}, confidence=${group.confidence}, fallback=${group.fallback ? 'yes' : 'no'})`;
     const reason = group.impactReason ? `  - why: ${group.impactReason}` : null;
+    const role = group.functionRole ? `  - role: ${group.functionRole}` : null;
+    const exported = group.isExported ? '  - exported: yes' : null;
+    const calls = group.callsInContext && group.callsInContext.length > 0 ? `  - calls: ${group.callsInContext.join(', ')}` : null;
+    const imports = group.importsInFile && group.importsInFile.length > 0 ? `  - imports from: ${group.importsInFile.slice(0, 5).join(', ')}` : null;
     const lines = group.lines.slice(0, 3).map((hit, hitIndex) => {
       const label = hitIndex === 0 ? 'top preview' : 'line';
       const priority = typeof hit.previewPriority === 'number' ? `, priority=${hit.previewPriority}` : '';
       const rationale = hit.previewPriorityReason ? `, why=${hit.previewPriorityReason}` : '';
       return `  - ${label} ${hit.line}${hit.character ? `:${hit.character}` : ''}${priority}${rationale}${hit.preview ? ` — ${hit.preview}` : ''}`;
     });
-    return [header, ...(reason ? [reason] : []), ...lines];
+    return [header, ...(reason ? [reason] : []), ...(role ? [role] : []), ...(exported ? [exported] : []), ...(calls ? [calls] : []), ...(imports ? [imports] : []), ...lines];
   });
+}
+
+export function enrichReferenceGroup(
+  group: ReferenceFileGroup,
+  symbol: string,
+): void {
+  group.functionRole = inferFunctionRole(group.file);
+
+  const topPreview = group.topPreview?.preview ?? group.lines[0]?.preview ?? '';
+  group.isExported = /\bexport\b/.test(topPreview) || /\bexport\b/.test(group.lines.map((l) => l.preview ?? '').join(' '));
+
+  const allPreviews = group.lines.slice(0, 5).map((l) => l.preview ?? '');
+  const allCalls: string[] = [];
+  for (const preview of allPreviews) {
+    allCalls.push(...extractCallsFromPreview(preview, symbol));
+  }
+  group.callsInContext = [...new Set(allCalls)].slice(0, 10);
+
+  try {
+    const safePath = resolveWorkspaceFile(group.file);
+    if (safePath) {
+      const fileContent = readFileSync(safePath, 'utf8');
+      const fileLines = fileContent.split(/\r?\n/);
+      group.importsInFile = extractImportsFromLines(fileLines).slice(0, 10);
+    } else {
+      group.importsInFile = [];
+    }
+  } catch {
+    group.importsInFile = [];
+  }
 }

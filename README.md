@@ -36,7 +36,7 @@ Natural coding tasks, debug, fix, or feature, break into subtasks. Broad discove
 ## Value props
 
 - **Grounded symbol navigation**, minimal slices, definition location, grouped references.
-- **Navigation planner**, bounded 1-4 hop plan across `codesight_*`, `code_nav_*`, `lsp_navigation`, `read`, and answer-now.
+- **Navigation planner**, bounded 1-4 hop plan across discovery tools, `code_nav_*`, `lsp_navigation`, `read`, and answer-now.
 - **Session-aware reuse**, resolved definitions, top caller files, and queried symbols persist inside the session.
 - **Answer-now short-circuit**, planner can return a direct answer when evidence already suffices.
 - **Tight steering**, tool descriptions and intent classifier target agent subtask shape, not literal user wording.
@@ -90,7 +90,20 @@ Find the exact definition location of a grounded symbol.
 Find usages of a grounded symbol, grouped by file, caller file prioritized.
 - Input: `symbol` (required), `file`, `limit`.
 - Best when the subtask is caller tracing, usage tracing, or impact.
-- Returns: grouped hits, top caller file, next-step hints.
+- Returns: grouped hits with enriched context (calls, imports, function role, export status), top caller file, next-step hints.
+
+### `code_nav_trace`
+Transitive call-chain exploration. Finds references, then extracts what each caller file invokes.
+- Input: `symbol` (required), `file`, `depth` (1-3), `limit` (3-20).
+- Best when debugging requires following chains: `auth.login()` -> `validateUser()` -> `checkPermissions()`.
+- Returns: root symbol, callers with calls-in-context and imports, follow-up hints for deeper tracing.
+- Depth > 1 recursively traces the strongest caller chain.
+
+### `code_nav_compare`
+Side-by-side implementation analysis. Finds similar function implementations across a scope.
+- Input: `symbol` or `pattern` (one required), `scope`, `limit` (2-15).
+- Best when comparing how a pattern is implemented across files (e.g., error handling, validation).
+- Returns: implementations with calls, common pattern, outliers that deviate from the norm.
 
 ### `code_nav_rank_context`
 Prioritize files and symbols already observed inside this Pi session.
@@ -102,7 +115,7 @@ Prioritize files and symbols already observed inside this Pi session.
 Plan the next 1-4 navigation hops.
 - Input: `task` (required), `symbol`, `file`, `mode`, `limit`.
 - Returns: intent, best route, next tool, next args, fallback steps, stop conditions, evidence snapshot.
-- Possible routes: `codesight`, `code_nav`, `lsp_navigation`, `read`, `answer`.
+- Possible routes: `discovery`, `code_nav`, `lsp_navigation`, `read`, `answer`.
 
 ## Multi-language support
 
@@ -147,7 +160,7 @@ After manifest changes, run `pi update` or reinstall the package so new commands
 
 ```ts
 type PlannerStatus = 'needs-discovery' | 'grounded-next-hop' | 'needs-narrowing' | 'answer-now';
-type ToolRouteFamily = 'codesight' | 'code_nav' | 'lsp_navigation' | 'read' | 'answer';
+type ToolRouteFamily = 'discovery' | 'code_nav' | 'lsp_navigation' | 'read' | 'answer';
 
 interface NavigationPlan {
   intent: 'inspect' | 'define' | 'trace' | 'impact' | 'debug' | 'discover' | 'explain';

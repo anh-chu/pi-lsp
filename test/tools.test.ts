@@ -17,7 +17,7 @@ test('registers expected pi-lsp tools', () => {
   registerPiLspTools(pi);
   assert.deepEqual(
     pi.tools.map((tool) => tool.name),
-    ['code_nav_get_symbol', 'code_nav_find_definition', 'code_nav_find_references', 'code_nav_rank_context', 'code_nav_plan_navigation', 'ast_grep_search', 'ast_grep_replace'],
+    ['code_nav_get_symbol', 'code_nav_find_definition', 'code_nav_find_references', 'code_nav_trace', 'code_nav_compare', 'code_nav_rank_context', 'code_nav_plan_navigation', 'ast_grep_search', 'ast_grep_replace'],
   );
 });
 
@@ -75,7 +75,7 @@ test('getSymbolSlice returns explicit failure for missing symbol with anti-guess
     assert.equal(result.details.likelyCause, 'inexact-symbol-name');
     assert.match(result.content, /no exact definition candidate found/i);
     assert.match(result.content, /guessed or approximate symbol name/i);
-    assert.match(result.content, /use codesight_\*/i);
+    assert.match(result.content, /use discovery tools/i);
     assert.equal(Array.isArray(result.details.suggestedNextSteps), true);
   });
 });

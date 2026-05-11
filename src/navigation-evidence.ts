@@ -19,5 +19,6 @@ export function snapshotNavigationEvidence(query: PlannerQuery): EvidenceSnapsho
     lastResolvedDefinition: state.lastResolvedDefinition,
     lastTopCallerFiles: [...state.lastTopCallerFiles],
     lastPlannerSummary: state.lastPlannerResult,
+    symbolRelationships: [...state.symbolRelationships],
   };
 }
